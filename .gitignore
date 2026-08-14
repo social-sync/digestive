@@ -1,0 +1,11 @@
+# Compiled binary
+/sql-exporter
+
+# Local secrets and env
+.env
+
+# Export output
+/exports/
+
+# Editor/OS noise
+.DS_Store

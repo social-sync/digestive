@@ -1,0 +1,47 @@
+# Example sql-exporter configuration.
+#
+# ${VAR} references are substituted from the environment (a .env file in the
+# working directory is also consulted; real environment variables win). A
+# reference with no value and no ${VAR:-default} fails the run loudly.
+
+source:
+  # go-sql-driver/mysql DSN. SingleStore is MySQL wire compatible.
+  dsn: ${SINGLESTORE_DSN}
+
+destination:
+  # Local directory. Each run writes into a timestamped sub-directory.
+  directory: ./exports
+
+hashing:
+  # HMAC secret for deterministic hashing. Keep it out of the file and stable
+  # across runs, or pseudonyms (and joins) will change.
+  key: ${EXPORT_HASH_KEY}
+
+tables:
+  # Quick path: a bare table name exports the whole table, untransformed.
+  - countries
+
+  # Full form: row-reduction plus per-column transforms.
+  - name: users
+    where: "created_at > '2024-01-01'"   # raw SQL, trusted config
+    order_by: "id"                       # makes LIMIT deterministic
+    limit: 10000
+    columns:
+      email:
+        transform: hash_email            # stays email-shaped
+      full_name:
+        transform: mask                  # keep first/last, mask the middle
+        keep_first: 1
+        keep_last: 0
+      ssn:
+        transform: constant
+        value: "REDACTED"
+      deleted_reason:
+        transform: "null"                # column must be nullable
+
+  - name: orders
+    columns:
+      # A shared value hashes identically everywhere, so this still joins to
+      # users.email above.
+      user_email:
+        transform: hash_email
