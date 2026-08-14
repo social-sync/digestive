@@ -22,6 +22,7 @@ export default defineConfig({
 				{ label: 'Installation', slug: 'installation' },
 				{ label: 'Configuration', slug: 'configuration' },
 				{ label: 'Transformers', slug: 'transformers' },
+				{ label: 'Restore', slug: 'restore' },
 			],
 		}),
 	],

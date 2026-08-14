@@ -30,7 +30,7 @@ model.
 A single metadata file written per export run. Records, per table: ordered
 column list, original Source column types, nullability, and the mapping from
 Source type to the storage format's type. It is the source of truth for
-reconstructing exact INSERTs; the data files hold only values.
+restoring exact INSERTs; the data files hold only values.
 
 ### Transformation
 A rule applied to a column's values on the way out. Families:
@@ -85,22 +85,32 @@ config, not untrusted input.
 > Keeping filtered tables referentially consistent is the operator's
 > responsibility. FK-aware subsetting is explicitly deferred.
 
-### Reconstruction
+### Restore
 Reading data files + Manifest and emitting `INSERT` statements. Lives in the
-same single binary, but is **deferred past v1**. The v1 output format and
-Manifest are designed to make it possible. Two future capabilities it must
-support (and which shape the format now):
+same single binary, exposed as the `restore` command. It reads only an export
+run directory — no config, no Source connection — and streams a single SQL
+script of batched multi-row `INSERT`s to stdout, ready for the `mysql` client or
+a SQL editor. Types are preserved for a same-engine round-trip: the Manifest's
+recorded Source types drive how each value becomes a SQL literal, and the
+lossless-fallback types (see below) are emitted as quoted string literals the
+engine coerces back. A required `--dialect` (`singlestore` or `mysql`) selects
+the session preamble. See
+[ADR-0005](./docs/adr/0005-restore-to-sql.md).
+
+Two future capabilities the format still anticipates (and which shaped it):
 - **Streaming load** — stream each Parquet file, convert to INSERTs on the fly,
   and pipe directly into a destination DB (no intermediate `.sql` file needed).
 - **Cross-engine type mapping** — a separate mapping config that translates
   Source types into another engine's types (Postgres is the primary target),
-  so a SingleStore export can be reconstructed into a different DB engine. This
-  is why the Manifest records full, precise Source type information.
+  so a SingleStore export can be restored into a different DB engine. This is
+  why the Manifest records full, precise Source type information, and why
+  `--dialect` is the seam it would hook into. **Deferred.**
 
 ## v1 scope
 
-In scope: `export` (config → Parquet + Manifest) and `validate` (parse config,
-expand env, connect, check tables/columns exist, no export). Everything else
-above — anonymisation/fakers, remote Destinations, FK-aware subsetting,
-`reconstruct`, streaming load, cross-engine mapping — is deferred but designed
-for.
+In scope: `export` (config → Parquet + Manifest), `validate` (parse config,
+expand env, connect, check tables/columns exist, no export), and `restore`
+(export run → single SQL script of INSERTs, same-engine round-trip). Everything
+else above — realistic fakers, remote Destinations, FK-aware subsetting,
+streaming load piped into a live DB, cross-engine mapping — is deferred but
+designed for.
