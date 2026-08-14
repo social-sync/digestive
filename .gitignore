@@ -4,6 +4,9 @@
 # Local secrets and env
 .env
 
+# Generated starter config (created by `grimnir init`)
+/config.yaml
+
 # Export output
 /exports/
 
