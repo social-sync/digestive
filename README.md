@@ -1,0 +1,103 @@
+# Grimnir
+
+A single-binary database exporter that pulls tables from a SingleStore
+(MySQL-wire-compatible) database, anonymises / redacts / deterministically
+hashes columns on the way out, and writes the result as **Parquet** files plus
+a **manifest** describing how to reconstruct exact `INSERT`s later.
+
+The domain model lives in [CONTEXT.md](./CONTEXT.md); the load-bearing design
+decisions are recorded in [docs/adr/](./docs/adr/).
+
+## Build
+
+```sh
+make build        # CGO-free static binary: ./grimnir
+make test
+```
+
+## Usage
+
+```sh
+grimnir init                             # create starter .env + config.yaml (won't overwrite)
+grimnir validate --config config.yaml    # check config against live schema, no export
+grimnir export   --config config.yaml    # run the export
+```
+
+`init` writes a `config.yaml` and a `.env` containing a freshly generated
+random hashing key (`EXPORT_HASH_KEY`). It never overwrites: if either file
+already exists it fails and writes nothing. Edit `.env` to set your
+`SINGLESTORE_DSN`, then edit `config.yaml`.
+
+`export` flags:
+
+- `--run-name NAME` — name the run directory (default: UTC timestamp).
+- `--delete-on-failure` — remove the whole run directory if the export fails,
+  so repeated failures don't accumulate partial output.
+
+Each run writes:
+
+```
+<destination>/<run-name>/
+  manifest.json        # written last; its absence means the run is incomplete
+  <table>.parquet      # one file per table
+```
+
+## Configuration
+
+See the template at [internal/templates/config.yaml](./internal/templates/config.yaml)
+(what `init` writes). Config is YAML with `${VAR}`
+substitution (a `.env` file is consulted; real environment variables win).
+Missing variables with no `${VAR:-default}` fail the run.
+
+- **Table selection is opt-in.** Only listed tables are exported. A bare table
+  name (`- users`) exports the whole table untransformed.
+- **Columns pass through by default.** You only name columns that need a
+  transform; other columns are exported unchanged.
+- **Row reduction** per table via a raw `where` fragment, `order_by`, and
+  `limit`. Filters are applied per table with **no automatic foreign-key
+  following** — keeping filtered tables mutually consistent is your
+  responsibility.
+
+### Transforms
+
+| Transform    | Family    | Notes |
+|--------------|-----------|-------|
+| `null`       | redaction | Sets the value to NULL. Column must be nullable. |
+| `constant`   | redaction | Replaces with a fixed `value`. NULL stays NULL. |
+| `mask`       | redaction | Keeps `keep_first` / `keep_last` runes, fills the rest with `mask_char` (default `*`). Text columns only. |
+| `hash`       | hashing   | HMAC-keyed hex pseudonym; optional `length`, optional `group`. Text columns only. |
+| `hash_email` | hashing   | HMAC-keyed but email-shaped (`local@domain.example`). Text columns only. |
+
+Deterministic hashing is **global by default**: the same input yields the same
+pseudonym everywhere (keyed by `hashing.key`), so foreign-key relationships
+survive. Set a `group` on a column to isolate it into a separate namespace. The
+`hashing.key` must stay stable across runs, or pseudonyms change.
+
+## Type mapping (SingleStore → Parquet)
+
+Per [ADR-0003](./docs/adr/0003-hybrid-type-mapping-with-lossless-fallback.md):
+native Parquet types where safe, lossless string/bytes fallback otherwise. The
+manifest records the source type and whether the column was stored losslessly.
+
+| Source type | Parquet | Lossless fallback? |
+|-------------|---------|--------------------|
+| `tinyint`, `smallint`, `mediumint`, `int`, `integer` (any sign) | `INT64` | no |
+| `bigint` (signed) | `INT64` | no |
+| `bigint unsigned` | `BYTE_ARRAY(STRING)` | yes — exceeds signed 64-bit range |
+| `float`, `double`, `real` | `DOUBLE` | no |
+| `decimal` / `numeric` | `BYTE_ARRAY(STRING)` | yes — preserves precision/scale |
+| `char`, `varchar`, `*text`, `enum`, `set` | `BYTE_ARRAY(STRING)` | no |
+| `date`, `datetime`, `timestamp`, `time`, `year` | `BYTE_ARRAY(STRING)` | yes — avoids zero-dates & precision loss |
+| `json`, `vector`, `geography`, `geographypoint` | `BYTE_ARRAY(STRING)` | yes — no native equivalent |
+| `binary`, `varbinary`, `*blob`, `bit`, `bson` | `BYTE_ARRAY` | yes |
+| anything else | `BYTE_ARRAY` | yes — preserved raw to avoid corruption |
+
+Only text columns (`char`/`varchar`/`*text`/`enum`/`set`) may be hashed or
+masked; the tool rejects a config that targets any other type.
+
+## Scope
+
+v1 implements `export` and `validate`. Reconstruction (`reconstruct` /
+streaming load into a destination DB), cross-engine type remapping (e.g. to
+Postgres), an anonymisation/faker family, remote destinations, and FK-aware
+subsetting are **deferred but designed for** — see the ADRs.
