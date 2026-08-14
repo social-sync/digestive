@@ -1,4 +1,4 @@
-# Example sql-exporter configuration.
+# Example grimnir configuration.
 #
 # ${VAR} references are substituted from the environment (a .env file in the
 # working directory is also consulted; real environment variables win). A

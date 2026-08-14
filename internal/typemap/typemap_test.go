@@ -3,7 +3,7 @@ package typemap
 import (
 	"testing"
 
-	"github.com/danmatthews/sql-exporter/internal/value"
+	"github.com/danmatthews/grimnir/internal/value"
 )
 
 func TestMap(t *testing.T) {

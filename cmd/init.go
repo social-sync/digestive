@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/danmatthews/sql-exporter/internal/templates"
+	"github.com/danmatthews/grimnir/internal/templates"
 	"github.com/spf13/cobra"
 )
 
@@ -67,7 +67,7 @@ func runInit() error {
 
 	fmt.Printf("created %s and %s\n", initEnvFile, initConfigFile)
 	fmt.Printf("a random hashing key was written to %s (EXPORT_HASH_KEY); keep it stable across runs\n", initEnvFile)
-	fmt.Printf("edit %s to set SINGLESTORE_DSN, then edit %s and run: sql-exporter validate\n", initEnvFile, initConfigFile)
+	fmt.Printf("edit %s to set SINGLESTORE_DSN, then edit %s and run: grimnir validate\n", initEnvFile, initConfigFile)
 	return nil
 }
 

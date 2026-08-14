@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/danmatthews/sql-exporter/internal/value"
+	"github.com/danmatthews/grimnir/internal/value"
 	_ "github.com/go-sql-driver/mysql"
 )
 

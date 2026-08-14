@@ -1,4 +1,4 @@
-module github.com/danmatthews/sql-exporter
+module github.com/danmatthews/grimnir
 
 go 1.26.4
 

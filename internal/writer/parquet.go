@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/danmatthews/sql-exporter/internal/typemap"
-	"github.com/danmatthews/sql-exporter/internal/value"
+	"github.com/danmatthews/grimnir/internal/typemap"
+	"github.com/danmatthews/grimnir/internal/value"
 	"github.com/parquet-go/parquet-go"
 )
 

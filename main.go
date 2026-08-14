@@ -1,6 +1,6 @@
 package main
 
-import "github.com/danmatthews/sql-exporter/cmd"
+import "github.com/danmatthews/grimnir/cmd"
 
 func main() {
 	cmd.Execute()

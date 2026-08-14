@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danmatthews/sql-exporter/internal/value"
+	"github.com/danmatthews/grimnir/internal/value"
 )
 
 func build(t *testing.T, spec Spec, key []byte) Transformer {

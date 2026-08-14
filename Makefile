@@ -1,4 +1,4 @@
-BINARY := sql-exporter
+BINARY := grimnir
 
 .PHONY: build test vet fmt clean
 

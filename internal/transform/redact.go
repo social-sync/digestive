@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	"github.com/danmatthews/sql-exporter/internal/value"
+	"github.com/danmatthews/grimnir/internal/value"
 )
 
 // null replaces any value with SQL NULL.

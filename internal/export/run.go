@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/danmatthews/sql-exporter/internal/config"
-	"github.com/danmatthews/sql-exporter/internal/manifest"
-	"github.com/danmatthews/sql-exporter/internal/source"
-	"github.com/danmatthews/sql-exporter/internal/typemap"
-	"github.com/danmatthews/sql-exporter/internal/value"
-	"github.com/danmatthews/sql-exporter/internal/writer"
+	"github.com/danmatthews/grimnir/internal/config"
+	"github.com/danmatthews/grimnir/internal/manifest"
+	"github.com/danmatthews/grimnir/internal/source"
+	"github.com/danmatthews/grimnir/internal/typemap"
+	"github.com/danmatthews/grimnir/internal/value"
+	"github.com/danmatthews/grimnir/internal/writer"
 )
 
 // Options configures an export run.

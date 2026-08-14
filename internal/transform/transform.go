@@ -10,7 +10,7 @@ package transform
 import (
 	"fmt"
 
-	"github.com/danmatthews/sql-exporter/internal/value"
+	"github.com/danmatthews/grimnir/internal/value"
 )
 
 // Names of the built-in transforms, as written in config.

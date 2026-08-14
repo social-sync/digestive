@@ -1,4 +1,4 @@
-# sql-exporter
+# Grimnir
 
 A single-binary database exporter that pulls tables from a SingleStore
 (MySQL-wire-compatible) database, anonymises / redacts / deterministically
@@ -11,16 +11,16 @@ decisions are recorded in [docs/adr/](./docs/adr/).
 ## Build
 
 ```sh
-make build        # CGO-free static binary: ./sql-exporter
+make build        # CGO-free static binary: ./grimnir
 make test
 ```
 
 ## Usage
 
 ```sh
-sql-exporter init                             # create starter .env + config.yaml (won't overwrite)
-sql-exporter validate --config config.yaml    # check config against live schema, no export
-sql-exporter export   --config config.yaml    # run the export
+grimnir init                             # create starter .env + config.yaml (won't overwrite)
+grimnir validate --config config.yaml    # check config against live schema, no export
+grimnir export   --config config.yaml    # run the export
 ```
 
 `init` writes a `config.yaml` and a `.env` containing a freshly generated

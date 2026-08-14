@@ -7,10 +7,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/danmatthews/sql-exporter/internal/config"
-	"github.com/danmatthews/sql-exporter/internal/source"
-	"github.com/danmatthews/sql-exporter/internal/transform"
-	"github.com/danmatthews/sql-exporter/internal/typemap"
+	"github.com/danmatthews/grimnir/internal/config"
+	"github.com/danmatthews/grimnir/internal/source"
+	"github.com/danmatthews/grimnir/internal/transform"
+	"github.com/danmatthews/grimnir/internal/typemap"
 )
 
 // columnPlan is the resolved plan for one column of a table.

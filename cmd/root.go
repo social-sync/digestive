@@ -1,4 +1,4 @@
-// Package cmd implements the sql-exporter command-line interface.
+// Package cmd implements the grimnir command-line interface.
 package cmd
 
 import (
@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/danmatthews/sql-exporter/internal/config"
-	"github.com/danmatthews/sql-exporter/internal/source"
+	"github.com/danmatthews/grimnir/internal/config"
+	"github.com/danmatthews/grimnir/internal/source"
 	"github.com/spf13/cobra"
 )
 
@@ -18,9 +18,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "sql-exporter",
+	Use:   "grimnir",
 	Short: "Export and anonymise database tables to Parquet",
-	Long: "sql-exporter pulls tables from a SingleStore (MySQL-wire) database, " +
+	Long: "grimnir pulls tables from a SingleStore (MySQL-wire) database, " +
 		"applies redaction and deterministic-hashing transforms, and writes the " +
 		"results to Parquet files plus a manifest for later reconstruction.",
 	SilenceUsage:  true,

@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/danmatthews/sql-exporter/internal/value"
+	"github.com/danmatthews/grimnir/internal/value"
 	"github.com/parquet-go/parquet-go"
 )
 

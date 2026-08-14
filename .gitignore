@@ -1,5 +1,5 @@
 # Compiled binary
-/sql-exporter
+/grimnir
 
 # Local secrets and env
 .env

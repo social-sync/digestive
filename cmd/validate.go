@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/danmatthews/sql-exporter/internal/export"
+	"github.com/danmatthews/grimnir/internal/export"
 	"github.com/spf13/cobra"
 )
 
