@@ -101,6 +101,12 @@ func Run(ctx context.Context, src source.Source, cfg *config.Config, opts Option
 	return runDir, nil
 }
 
+// fallbackReporter is implemented by transforms that can silently fall back to
+// redaction (json_anonymise), so a run can report how often that happened.
+type fallbackReporter interface {
+	FallbackCount() int
+}
+
 // exportTable streams one table into a Parquet file and returns its Manifest
 // entry.
 func exportTable(ctx context.Context, src source.Source, runDir string, plan tablePlan, log *slog.Logger) (manifest.Table, error) {
@@ -154,6 +160,17 @@ func exportTable(ctx context.Context, src source.Source, runDir string, plan tab
 	}
 	if err := pw.Close(); err != nil {
 		return manifest.Table{}, err
+	}
+
+	// Surface any json_anonymise cells that failed to parse and were redacted
+	// whole — a large count usually means the transform is on the wrong column.
+	for _, cp := range plan.columns {
+		if fr, ok := cp.xform.(fallbackReporter); ok {
+			if n := fr.FallbackCount(); n > 0 {
+				log.Warn("json_anonymise redacted unparseable cells",
+					"table", plan.cfg.Name, "column", cp.col.Name, "cells", n)
+			}
+		}
 	}
 
 	return manifest.Table{

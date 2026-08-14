@@ -87,6 +87,18 @@ type ColumnConfig struct {
 	// hash / hash_email: optional namespace and hex output length.
 	Group  string `yaml:"group"`
 	Length int    `yaml:"length"`
+
+	// json_anonymise: per-path rules for anonymising inside a JSON document.
+	JSON *JSONConfig `yaml:"json"`
+}
+
+// JSONConfig holds the per-path rules for a json_anonymise transform. Keep lists
+// paths (leaf or subtree) passed through untouched; Paths maps a path to the
+// transform applied to the leaf there. Anything not named is anonymised by the
+// built-in default-deny rules.
+type JSONConfig struct {
+	Keep  []string                `yaml:"keep"`
+	Paths map[string]ColumnConfig `yaml:"paths"`
 }
 
 // Load reads, env-expands, and parses the config at path. A .env file in the

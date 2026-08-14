@@ -113,7 +113,7 @@ hashing:
 
 | Key | Type | Required | Description |
 | --- | --- | --- | --- |
-| `key` | string | only if a `hash`/`hash_email` transform is used | HMAC secret for deterministic hashing. |
+| `key` | string | only if a `hash`, `hash_email`, or `json_anonymise` transform is used | HMAC secret for deterministic hashing. |
 
 Supply this via `${VAR}` substitution rather than writing it inline. The same
 key must be reused across runs, or hashed values (and the joins that depend on
@@ -198,6 +198,29 @@ This is intended for **generated or computed columns** (which can't be
 reconstructed) and columns you simply never want to leave the database.
 `exclude: true` cannot be combined with a `transform` on the same column, and a
 table must have at least one column left after exclusions.
+
+#### Anonymising inside a JSON column
+
+A `json` column can be anonymised *in place* with the
+[`json_anonymise`](/transformers/#json_anonymise) transform, which keeps the
+document's shape but replaces the values inside it. It takes a `json` block with
+`keep` (paths passed through untouched) and `paths` (a path → transform map):
+
+```yaml
+columns:
+  payload:                      # a native json column
+    transform: json_anonymise
+    json:
+      paths:
+        details.email: { transform: hash_email }
+        details.phone: { transform: mask, keep_last: 3 }
+      keep:
+        - details.marketingConsent
+```
+
+It is **default-deny**: every leaf you don't `keep` or name in `paths` is
+anonymised automatically. See [Transformers](/transformers/#json_anonymise) for
+the full behaviour, path syntax, and worked examples.
 
 :::note[No schema-drift detection]
 If someone later adds a new sensitive column to a table and you don't add it to

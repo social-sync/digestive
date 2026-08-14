@@ -60,18 +60,27 @@ Missing variables with no `${VAR:-default}` fail the run.
 
 ### Transforms
 
-| Transform    | Family    | Notes |
-|--------------|-----------|-------|
-| `null`       | redaction | Sets the value to NULL. Column must be nullable. |
-| `constant`   | redaction | Replaces with a fixed `value`. NULL stays NULL. |
-| `mask`       | redaction | Keeps `keep_first` / `keep_last` runes, fills the rest with `mask_char` (default `*`). Text columns only. |
-| `hash`       | hashing   | HMAC-keyed hex pseudonym; optional `length`, optional `group`. Text columns only. |
-| `hash_email` | hashing   | HMAC-keyed but email-shaped (`local@domain.example`). Text columns only. |
+| Transform        | Family        | Notes |
+|------------------|---------------|-------|
+| `null`           | redaction     | Sets the value to NULL. Column must be nullable. |
+| `constant`       | redaction     | Replaces with a fixed `value`. NULL stays NULL. |
+| `mask`           | redaction     | Keeps `keep_first` / `keep_last` runes, fills the rest with `mask_char` (default `*`). Text columns only. |
+| `hash`           | hashing       | HMAC-keyed hex pseudonym; optional `length`, optional `group`. Text columns only. |
+| `hash_email`     | hashing       | HMAC-keyed but email-shaped (`local@domain.example`). Text columns only. |
+| `json_anonymise` | anonymisation | Anonymises the values *inside* a JSON document while keeping its shape. JSON columns only. See [ADR-0004](./docs/adr/0004-json-anonymise-structural-in-place-anonymisation.md). |
 
 Deterministic hashing is **global by default**: the same input yields the same
 pseudonym everywhere (keyed by `hashing.key`), so foreign-key relationships
 survive. Set a `group` on a column to isolate it into a separate namespace. The
 `hashing.key` must stay stable across runs, or pseudonyms change.
+
+`json_anonymise` keeps a `json` column's structure (keys, nesting, null-vs-set)
+intact so it still deserializes, but anonymises the values within. It is
+**default-deny**: every leaf you do not `keep` or name in `paths` is anonymised
+automatically (non-empty strings hashed, numbers → `0`; nulls, empty strings and
+booleans preserved), so PII added to the document upstream is anonymised even if
+you never configured it. Leaf hashes share the same global namespace as scalar
+hashes, so joins survive across the boundary.
 
 ## Type mapping (SingleStore → Parquet)
 
@@ -99,5 +108,7 @@ masked; the tool rejects a config that targets any other type.
 
 v1 implements `export` and `validate`. Reconstruction (`reconstruct` /
 streaming load into a destination DB), cross-engine type remapping (e.g. to
-Postgres), an anonymisation/faker family, remote destinations, and FK-aware
-subsetting are **deferred but designed for** — see the ADRs.
+Postgres), a **realistic faker** family (plausible fake names/addresses),
+remote destinations, and FK-aware subsetting are **deferred but designed for** —
+see the ADRs. Structural JSON anonymisation (`json_anonymise`) is implemented;
+faker-backed *realistic* leaf values are the deferred part.

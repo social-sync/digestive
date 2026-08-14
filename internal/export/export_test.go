@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -208,6 +209,102 @@ func TestValidateCatchesTextOnlyTransform(t *testing.T) {
 	}
 	if err := Validate(context.Background(), src, cfg); err == nil {
 		t.Fatal("expected validation error for hashing a non-text column")
+	}
+}
+
+func TestValidateCatchesJSONOnlyTransform(t *testing.T) {
+	src := &fakeSource{
+		cols: map[string][]source.Column{
+			"users": {{Name: "notes", DataType: "text", Nullable: true}},
+		},
+		rows: map[string][][]value.Value{},
+	}
+	cfg := &config.Config{
+		Hashing: config.HashingConfig{Key: "k"},
+		Tables: []config.TableConfig{
+			{Name: "users", Columns: map[string]config.ColumnConfig{
+				"notes": {Transform: "json_anonymise"}, // a text column, not json
+			}},
+		},
+	}
+	if err := Validate(context.Background(), src, cfg); err == nil {
+		t.Fatal("expected validation error for json_anonymise on a non-json column")
+	}
+}
+
+func TestRunJSONAnonymise(t *testing.T) {
+	blob := `{"details":{"firstName":"Daryl","email":"vonaxor@mailinator.com",` +
+		`"marketingConsent":{"email":true},"dob":1984,"note":""},"facebookUser":null}`
+	src := &fakeSource{
+		cols: map[string][]source.Column{
+			"registrations": {
+				{Name: "id", DataType: "bigint", Nullable: false},
+				{Name: "payload", DataType: "json", Nullable: false},
+			},
+		},
+		rows: map[string][][]value.Value{
+			"registrations": {{text("1"), text(blob)}},
+		},
+	}
+	dir := t.TempDir()
+	cfg := &config.Config{
+		Destination: config.DestinationConfig{Directory: dir},
+		Hashing:     config.HashingConfig{Key: "secret"},
+		Tables: []config.TableConfig{
+			{Name: "registrations", Columns: map[string]config.ColumnConfig{
+				"payload": {
+					Transform: "json_anonymise",
+					JSON: &config.JSONConfig{
+						Keep: []string{"details.marketingConsent"},
+						Paths: map[string]config.ColumnConfig{
+							"details.email": {Transform: "hash_email"},
+						},
+					},
+				},
+			}},
+		},
+	}
+
+	runDir, err := Run(context.Background(), src, cfg, Options{RunName: "r", Now: time.Unix(0, 0)})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	rows := readParquet(t, filepath.Join(runDir, "registrations.parquet"))
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d", len(rows))
+	}
+
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(rows[0]["payload"].(string)), &doc); err != nil {
+		t.Fatalf("anonymised payload is not valid JSON: %v", err)
+	}
+	details := doc["details"].(map[string]any)
+
+	if details["firstName"] == "Daryl" { // unnamed string → hashed
+		t.Errorf("firstName not anonymised: %v", details["firstName"])
+	}
+	if e, _ := details["email"].(string); e == "vonaxor@mailinator.com" ||
+		!strings.Contains(e, "@") || !strings.HasSuffix(e, ".example") {
+		t.Errorf("email not email-shaped: %v", details["email"])
+	}
+	if details["dob"] != float64(0) { // unnamed number → 0
+		t.Errorf("dob not zeroed: %v", details["dob"])
+	}
+	if details["note"] != "" { // empty string preserved
+		t.Errorf("empty string not preserved: %v", details["note"])
+	}
+	if mc := details["marketingConsent"].(map[string]any); mc["email"] != true { // kept subtree
+		t.Errorf("kept subtree altered: %v", mc)
+	}
+	if doc["facebookUser"] != nil { // null preserved
+		t.Errorf("null not preserved: %v", doc["facebookUser"])
+	}
+
+	// Manifest records the transform on the json column.
+	man := readManifest(t, filepath.Join(runDir, "manifest.json"))
+	if col := columnByName(man.Tables[0].Columns, "payload"); col == nil || col.Transform != "json_anonymise" {
+		t.Errorf("manifest missing json_anonymise transform: %+v", man.Tables[0].Columns)
 	}
 }
 
