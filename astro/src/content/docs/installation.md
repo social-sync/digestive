@@ -91,3 +91,9 @@ Describe the tables you want in `config.yaml` (see
 A successful export prints the run directory it produced, e.g.
 `./exports/20260814T150405Z/`, containing one Parquet file per table plus a
 `manifest.json`.
+
+To turn that run back into loadable SQL, see [Restore](/restore/):
+
+```sh
+./grimnir restore ./exports/20260814T150405Z --dialect singlestore > dump.sql
+```

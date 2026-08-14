@@ -54,6 +54,21 @@ type Column struct {
 	Transform string `json:"transform,omitempty"`
 }
 
+// Load reads and parses a manifest.json from path. It is the entry point for
+// restore, which reconstructs INSERTs purely from the manifest and Parquet
+// files.
+func Load(path string) (*Manifest, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read manifest: %w", err)
+	}
+	var m Manifest
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, fmt.Errorf("parse manifest %s: %w", path, err)
+	}
+	return &m, nil
+}
+
 // Write serialises the manifest as indented JSON to path.
 func (m *Manifest) Write(path string) error {
 	data, err := json.MarshalIndent(m, "", "  ")

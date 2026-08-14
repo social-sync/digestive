@@ -38,7 +38,7 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", "config.yaml", "path to the YAML config file")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "log level (debug, info, warn, error)")
-	rootCmd.AddCommand(exportCmd, validateCmd)
+	rootCmd.AddCommand(exportCmd, validateCmd, restoreCmd)
 }
 
 func newLogger() *slog.Logger {

@@ -21,6 +21,7 @@ make test
 grimnir init                             # create starter .env + config.yaml (won't overwrite)
 grimnir validate --config config.yaml    # check config against live schema, no export
 grimnir export   --config config.yaml    # run the export
+grimnir restore  <run-dir> --dialect singlestore > dump.sql   # export run -> SQL INSERTs
 ```
 
 `init` writes a `config.yaml` and a `.env` containing a freshly generated
@@ -41,6 +42,36 @@ Each run writes:
   manifest.json        # written last; its absence means the run is incomplete
   <table>.parquet      # one file per table
 ```
+
+## Restore
+
+`restore` turns an export run back into a single SQL script of `INSERT`
+statements — ready to pipe into the `mysql` client or paste into a SQL editor.
+It reads **only** the run directory (manifest + Parquet); no config file, no
+database connection. Types are preserved for a same-engine round-trip.
+
+```sh
+grimnir restore ./exports/20260814T150405Z --dialect singlestore > dump.sql
+# or stream straight into a client:
+grimnir restore ./exports/20260814T150405Z --dialect mysql | mysql -D mydb
+```
+
+`restore` flags:
+
+- `--dialect singlestore|mysql` — **required**, no default. It selects the
+  session preamble: both wrap the load in `SET NAMES utf8mb4` and a single
+  transaction; `mysql` additionally emits `SET FOREIGN_KEY_CHECKS=0` /
+  `SET UNIQUE_CHECKS=0` (SingleStore neither needs nor recognises those). Value
+  and identifier syntax are identical across both.
+- `--batch-size N` — rows per multi-row `INSERT` (default `1000`).
+- `--allow-incomplete` — restore a run whose `manifest.json` reports
+  `complete: false` (refused by default).
+
+The SQL goes to **stdout**; logs and warnings go to stderr. Table names are
+emitted unqualified, so pick the target database with the client
+(`mysql -D dbname`). No DDL is generated — the target is assumed to be a copy of
+the source database whose schema already exists. See
+[ADR-0005](./docs/adr/0005-restore-to-sql.md).
 
 ## Configuration
 
@@ -106,9 +137,10 @@ masked; the tool rejects a config that targets any other type.
 
 ## Scope
 
-v1 implements `export` and `validate`. Reconstruction (`reconstruct` /
-streaming load into a destination DB), cross-engine type remapping (e.g. to
-Postgres), a **realistic faker** family (plausible fake names/addresses),
-remote destinations, and FK-aware subsetting are **deferred but designed for** —
-see the ADRs. Structural JSON anonymisation (`json_anonymise`) is implemented;
-faker-backed *realistic* leaf values are the deferred part.
+v1 implements `export`, `validate`, and `restore` (export run → single SQL
+script of INSERTs, same-engine round-trip). Streaming load piped directly into a
+destination DB, cross-engine type remapping (e.g. to Postgres), a **realistic
+faker** family (plausible fake names/addresses), remote destinations, and
+FK-aware subsetting are **deferred but designed for** — see the ADRs. Structural
+JSON anonymisation (`json_anonymise`) is implemented; faker-backed *realistic*
+leaf values are the deferred part.
