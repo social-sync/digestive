@@ -182,6 +182,23 @@ Each entry has a `transform` key naming the transform, plus any options that
 transform accepts. See [Transformers](/transformers/) for the full catalogue
 and each transform's options and limits.
 
+#### Excluding a column
+
+Instead of a transform, a column entry may set `exclude: true` to drop the
+column from the export entirely — it is not read from the source, not written
+to Parquet, and not recorded in the manifest:
+
+```yaml
+columns:
+  full_name:      # a generated/derived column
+    exclude: true
+```
+
+This is intended for **generated or computed columns** (which can't be
+reconstructed) and columns you simply never want to leave the database.
+`exclude: true` cannot be combined with a `transform` on the same column, and a
+table must have at least one column left after exclusions.
+
 :::note[No schema-drift detection]
 If someone later adds a new sensitive column to a table and you don't add it to
 `columns`, it will be exported untransformed. There is no drift warning in v1 —

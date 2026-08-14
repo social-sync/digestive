@@ -52,10 +52,18 @@ func buildPlan(ctx context.Context, src source.Source, cfg *config.Config) ([]ta
 
 		// Every configured column must exist and validate.
 		xforms := make(map[string]transform.Transformer, len(t.Columns))
+		excluded := make(map[string]bool)
 		for colName, cc := range t.Columns {
 			col, ok := byName[colName]
 			if !ok {
 				return nil, fmt.Errorf("table %q has no column %q (referenced in config)", t.Name, colName)
+			}
+			if cc.Exclude {
+				if cc.Transform != "" {
+					return nil, fmt.Errorf("table %q column %q: 'exclude' cannot be combined with a transform", t.Name, colName)
+				}
+				excluded[colName] = true
+				continue
 			}
 			if err := validateColumnTransform(t.Name, col, cc, hashKey); err != nil {
 				return nil, err
@@ -69,12 +77,18 @@ func buildPlan(ctx context.Context, src source.Source, cfg *config.Config) ([]ta
 
 		plan := tablePlan{cfg: t}
 		for _, col := range cols {
+			if excluded[col.Name] {
+				continue
+			}
 			plan.columns = append(plan.columns, columnPlan{
 				col:       col,
 				mapping:   typemap.Map(col.DataType, col.Unsigned),
 				xform:     xforms[col.Name],
 				xformName: t.Columns[col.Name].Transform,
 			})
+		}
+		if len(plan.columns) == 0 {
+			return nil, fmt.Errorf("table %q has no columns left to export after exclusions", t.Name)
 		}
 		plans = append(plans, plan)
 	}

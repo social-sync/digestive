@@ -70,6 +70,12 @@ func (t *TableConfig) UnmarshalYAML(node *yaml.Node) error {
 type ColumnConfig struct {
 	Transform string `yaml:"transform"`
 
+	// Exclude drops the column from the export entirely — it is not read, not
+	// written to Parquet, and not recorded in the manifest. Useful for derived
+	// or generated columns that cannot be reconstructed. Cannot be combined
+	// with a transform.
+	Exclude bool `yaml:"exclude"`
+
 	// constant: the literal to substitute.
 	Value *string `yaml:"value"`
 

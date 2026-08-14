@@ -34,11 +34,24 @@ func (f *fakeSource) Columns(_ context.Context, table string) ([]source.Column, 
 }
 
 func (f *fakeSource) Query(_ context.Context, spec source.QuerySpec) (source.Rows, error) {
+	// Project stored rows down to the requested columns, mirroring a real
+	// SELECT that only reads the planned (non-excluded) columns.
+	full := f.cols[spec.Table]
+	idx := make([]int, len(spec.Columns))
+	for i, name := range spec.Columns {
+		idx[i] = -1
+		for j, c := range full {
+			if c.Name == name {
+				idx[i] = j
+				break
+			}
+		}
+	}
 	data := f.rows[spec.Table]
 	if spec.Limit != nil && *spec.Limit < len(data) {
 		data = data[:*spec.Limit]
 	}
-	return &fakeRows{data: data, i: -1}, nil
+	return &fakeRows{data: data, idx: idx, i: -1}, nil
 }
 
 type notFound struct{ table string }
@@ -47,14 +60,17 @@ func (e *notFound) Error() string { return "table not found: " + e.table }
 
 type fakeRows struct {
 	data [][]value.Value
+	idx  []int // stored-column index for each requested column
 	i    int
 }
 
 func (r *fakeRows) Next() bool { r.i++; return r.i < len(r.data) }
 func (r *fakeRows) Scan() ([]value.Value, error) {
 	row := r.data[r.i]
-	out := make([]value.Value, len(row))
-	copy(out, row)
+	out := make([]value.Value, len(r.idx))
+	for k, j := range r.idx {
+		out[k] = row[j]
+	}
 	return out, nil
 }
 func (r *fakeRows) Err() error   { return nil }
@@ -192,6 +208,75 @@ func TestValidateCatchesTextOnlyTransform(t *testing.T) {
 	}
 	if err := Validate(context.Background(), src, cfg); err == nil {
 		t.Fatal("expected validation error for hashing a non-text column")
+	}
+}
+
+func TestExcludeColumnIsDropped(t *testing.T) {
+	src := &fakeSource{
+		cols: map[string][]source.Column{
+			"users": {
+				{Name: "id", DataType: "bigint", Nullable: false},
+				{Name: "full_name", DataType: "varchar", Nullable: true}, // derived, to be excluded
+				{Name: "email", DataType: "varchar", Nullable: false},
+			},
+		},
+		rows: map[string][][]value.Value{
+			"users": {{text("1"), text("Ada Lovelace"), text("ada@x.com")}},
+		},
+	}
+	dir := t.TempDir()
+	cfg := &config.Config{
+		Destination: config.DestinationConfig{Directory: dir},
+		Hashing:     config.HashingConfig{Key: "secret"},
+		Tables: []config.TableConfig{
+			{Name: "users", Columns: map[string]config.ColumnConfig{
+				"full_name": {Exclude: true},
+				"email":     {Transform: "hash_email"},
+			}},
+		},
+	}
+
+	runDir, err := Run(context.Background(), src, cfg, Options{RunName: "r", Now: time.Unix(0, 0)})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	rows := readParquet(t, filepath.Join(runDir, "users.parquet"))
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d", len(rows))
+	}
+	if _, present := rows[0]["full_name"]; present {
+		t.Errorf("excluded column full_name was written to parquet: %v", rows[0])
+	}
+	if _, present := rows[0]["email"]; !present {
+		t.Errorf("non-excluded column email missing")
+	}
+
+	man := readManifest(t, filepath.Join(runDir, "manifest.json"))
+	if columnByName(man.Tables[0].Columns, "full_name") != nil {
+		t.Errorf("excluded column recorded in manifest")
+	}
+	if columnByName(man.Tables[0].Columns, "email") == nil {
+		t.Errorf("expected email in manifest")
+	}
+}
+
+func TestExcludeWithTransformErrors(t *testing.T) {
+	src := &fakeSource{
+		cols: map[string][]source.Column{
+			"users": {{Name: "id", DataType: "bigint", Nullable: false}},
+		},
+		rows: map[string][][]value.Value{},
+	}
+	cfg := &config.Config{
+		Tables: []config.TableConfig{
+			{Name: "users", Columns: map[string]config.ColumnConfig{
+				"id": {Exclude: true, Transform: "null"},
+			}},
+		},
+	}
+	if err := Validate(context.Background(), src, cfg); err == nil {
+		t.Fatal("expected error combining exclude with a transform")
 	}
 }
 
