@@ -1,0 +1,125 @@
+# Example: export and anonymise the socialsync `users` table.
+#
+# Secrets come from .env via dollar-brace variable substitution (run
+# `grimnir init` to generate .env with a random EXPORT_HASH_KEY).
+
+source:
+  dsn: ${SINGLESTORE_DSN}
+
+destination:
+  directory: ./exports
+
+hashing:
+  key: ${EXPORT_HASH_KEY}
+
+tables:
+  - name: users
+    # Keep the export small while iterating; remove for a full dump.
+    order_by: "id"
+    limit: 1000
+    columns:
+      # PII: keep the first letter, mask the rest.
+      name:
+        transform: mask
+        keep_first: 1
+        keep_last: 0
+
+      # PII: deterministic, email-shaped pseudonym. The same address always
+      # maps to the same value, so joins on email survive.
+      email:
+        transform: hash_email
+
+      # Credentials / secrets: destroy them outright.
+      password:
+        transform: constant
+        value: "password"
+      api_token:
+        transform: "null"
+      two_factor_secret:
+        transform: "null"
+      two_factor_recovery_codes:
+        transform: "null"
+      remember_token:
+        transform: "null"
+      socialsync_api_key:
+        transform: "null"
+
+      # External identifier: deterministic hash so it stays consistent but
+      # is no longer the real Facebook user id.
+      facebook_user_id:
+        transform: hash
+
+    # Columns left unlisted pass through untouched, e.g.:
+    #   id, current_customer_team_id  (numeric keys — relationships preserved)
+    #   system_status
+    #   email_verified_at, two_factor_confirmed_at, created_at, updated_at,
+    #   last_active_at  (timestamps)
+
+  # ---------------------------------------------------------------------------
+  # supporters: filtered to a single customer team.
+  #
+  # ${CUSTOMER_TEAM_ID} is substituted from .env before the YAML is parsed, so a
+  # single centralised variable can drive the WHERE clause of every table that
+  # has a customer_team_id column. Set CUSTOMER_TEAM_ID once in .env (or on the
+  # command line) and reuse it everywhere.
+  - name: supporters
+    where: "customer_team_id = ${CUSTOMER_TEAM_ID}"
+    order_by: "id"
+    limit: 5000 # optional; remove to export the whole team
+    columns:
+      # `name` is a generated/PERSISTED column (CONCAT of first_name +
+      # surname) that can't be reconstructed, so exclude it entirely.
+      name:
+        exclude: true
+      name_old:
+        transform: mask
+        keep_first: 1
+      first_name:
+        transform: mask
+        keep_first: 1
+      middle_name:
+        transform: mask
+        keep_first: 1
+      surname:
+        transform: mask
+        keep_first: 1
+      meta_name:
+        transform: mask
+        keep_first: 1
+      display_name:
+        transform: mask
+        keep_first: 1
+
+      # Emails -> deterministic, email-shaped pseudonyms.
+      primary_email:
+        transform: hash_email
+      meta_email:
+        transform: hash_email
+
+      # Phone -> keep the last 3 digits for shape, mask the rest.
+      primary_phone:
+        transform: mask
+        keep_last: 3
+
+      # External / platform identifiers -> deterministic hash.
+      external_id:
+        transform: hash
+      justgiving_user_id:
+        transform: hash
+      psid:
+        transform: hash
+
+      # Address & date of birth -> remove outright.
+      address_line_1:
+        transform: "null"
+      address_line_2:
+        transform: "null"
+      postal_code:
+        transform: mask
+        keep_first: 2
+      avatar_url:
+        transform: "null"
+      date_of_birth:
+        transform: "null"
+    # Tip: the consent blobs (ru_*_consent, ru_latest_order) can embed contact
+    # details — add `transform: "null"` to any you want redacted.
