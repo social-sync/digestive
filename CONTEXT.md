@@ -44,9 +44,17 @@ A rule applied to a column's values on the way out. Families:
   columns (the tool rejects a hash transform aimed at a non-text column). An
   **email** variant preserves email shape (`local@domain`).
 
-> **Deferred:** an **Anonymisation** family (realistic fake values via a faker
-> library — names, emails, phones, addresses) is out of scope for v1. The
-> transform registry is designed so it can be added later without disruption.
+- **Anonymisation** — keep a structured value's shape but anonymise the data
+  inside it. v1 built-in: `json_anonymise`, which walks a JSON document and
+  anonymises its leaves in place (default-deny) while preserving keys, nesting,
+  and null-vs-set, so the document still deserializes. See
+  [ADR-0004](./docs/adr/0004-json-anonymise-structural-in-place-anonymisation.md).
+
+> **Deferred:** a **realistic faker** capability (plausible fake values via a
+> faker library — names, emails, phones, addresses) is out of scope for v1.
+> `json_anonymise` produces *safe* leaf values (hashes, zeros), not realistic
+> ones; faker-backed leaf transforms are the deferred part. The transform
+> registry is designed so they can be added later without disruption.
 
 ### Hash group
 An optional label that scopes deterministic hashing to a namespace. Columns

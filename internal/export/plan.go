@@ -104,6 +104,10 @@ func validateColumnTransform(table string, col source.Column, cc config.ColumnCo
 		return fmt.Errorf("table %q column %q: transform %q requires a text column, but %q is %s",
 			table, col.Name, cc.Transform, col.Name, col.DataType)
 	}
+	if transform.IsJSONOnly(cc.Transform) && !typemap.IsJSON(col.DataType) {
+		return fmt.Errorf("table %q column %q: transform %q requires a json column, but %q is %s",
+			table, col.Name, cc.Transform, col.Name, col.DataType)
+	}
 	if transform.RequiresHashKey(cc.Transform) && len(hashKey) == 0 {
 		return fmt.Errorf("table %q column %q: transform %q requires hashing.key to be set",
 			table, col.Name, cc.Transform)
@@ -116,7 +120,7 @@ func validateColumnTransform(table string, col source.Column, cc config.ColumnCo
 }
 
 func specFromConfig(cc config.ColumnConfig) transform.Spec {
-	return transform.Spec{
+	spec := transform.Spec{
 		Transform: cc.Transform,
 		Value:     cc.Value,
 		KeepFirst: cc.KeepFirst,
@@ -125,4 +129,15 @@ func specFromConfig(cc config.ColumnConfig) transform.Spec {
 		Group:     cc.Group,
 		Length:    cc.Length,
 	}
+	if cc.JSON != nil {
+		js := &transform.JSONSpec{Keep: cc.JSON.Keep}
+		if len(cc.JSON.Paths) > 0 {
+			js.Paths = make(map[string]transform.Spec, len(cc.JSON.Paths))
+			for path, sub := range cc.JSON.Paths {
+				js.Paths[path] = specFromConfig(sub)
+			}
+		}
+		spec.JSON = js
+	}
+	return spec
 }

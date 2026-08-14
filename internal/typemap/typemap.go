@@ -144,3 +144,10 @@ func IsText(dataType string) bool {
 		return false
 	}
 }
+
+// IsJSON reports whether a source type is the native JSON type, used to enforce
+// that json_anonymise only targets JSON columns (whose validity the database
+// guarantees).
+func IsJSON(dataType string) bool {
+	return strings.ToLower(strings.TrimSpace(dataType)) == "json"
+}

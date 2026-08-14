@@ -45,3 +45,19 @@ tables:
       # users.email above.
       user_email:
         transform: hash_email
+
+  - name: registrations
+    columns:
+      # Anonymise the values inside a json column while keeping its shape, so it
+      # still deserializes into the same object. Default-deny: every leaf you do
+      # not keep or name is anonymised automatically (strings hashed, numbers -> 0,
+      # nulls/empty-strings/booleans preserved). Name a path only to give it a
+      # nicer transform, and keep the non-PII structure you want readable.
+      payload:
+        transform: json_anonymise
+        json:
+          paths:
+            details.email: { transform: hash_email }   # must stay email-shaped
+            details.phone: { transform: mask, keep_last: 3 }
+          keep:
+            - details.marketingConsent                  # non-PII, keep readable
