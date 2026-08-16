@@ -25,7 +25,10 @@ type ParquetWriter struct {
 }
 
 // NewParquet creates a writer for the given columns and their type mappings.
-// columns and mappings must be the same length and in the same order.
+// columns and mappings must be the same length and in the same order. Every
+// column chunk is compressed with zstd — the compression lives inside the
+// Parquet file, so consumers read it with any standard tool and never
+// decompress by hand.
 func NewParquet(finalPath string, columns []string, mappings []typemap.Mapping) (*ParquetWriter, error) {
 	if len(columns) != len(mappings) {
 		return nil, fmt.Errorf("columns/mappings length mismatch: %d vs %d", len(columns), len(mappings))
@@ -47,7 +50,7 @@ func NewParquet(finalPath string, columns []string, mappings []typemap.Mapping) 
 		finalPath: finalPath,
 		tmpPath:   tmpPath,
 		file:      f,
-		writer:    parquet.NewGenericWriter[any](f, schema),
+		writer:    parquet.NewGenericWriter[any](f, schema, parquet.Compression(&parquet.Zstd)),
 		columns:   columns,
 		mappings:  mappings,
 	}, nil

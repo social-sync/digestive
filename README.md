@@ -80,6 +80,10 @@ Each run writes:
   <table>.parquet      # one file per table
 ```
 
+Parquet files are compressed with **zstd**. The compression is stored inside
+each file, so any standard reader (DuckDB, pandas, Spark, …) opens it directly —
+there is no separate decompression step.
+
 ## Restore
 
 `restore` turns an export run back into a single SQL script of `INSERT`
