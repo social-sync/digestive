@@ -36,13 +36,15 @@ func TestMap(t *testing.T) {
 }
 
 func TestEncode(t *testing.T) {
-	if got, _ := Map("int", false).Encode(value.Text("42")); got != int64(42) {
+	// Scalars are returned as pointers so that a zero value is never mistaken
+	// for NULL by the Parquet writer (see Encode / TestEncodeZeroNotNull).
+	if got, _ := Map("int", false).Encode(value.Text("42")); got == nil || *got.(*int64) != 42 {
 		t.Errorf("int encode = %v (%T)", got, got)
 	}
-	if got, _ := Map("double", false).Encode(value.Text("3.5")); got != 3.5 {
+	if got, _ := Map("double", false).Encode(value.Text("3.5")); got == nil || *got.(*float64) != 3.5 {
 		t.Errorf("double encode = %v", got)
 	}
-	if got, _ := Map("varchar", false).Encode(value.Text("hi")); got != "hi" {
+	if got, _ := Map("varchar", false).Encode(value.Text("hi")); got == nil || *got.(*string) != "hi" {
 		t.Errorf("string encode = %v", got)
 	}
 	if got, _ := Map("int", false).Encode(value.Null); got != nil {
@@ -53,6 +55,22 @@ func TestEncode(t *testing.T) {
 	}
 	if got, _ := Map("blob", false).Encode(value.Value{Bytes: []byte{0x01, 0x02}}); string(got.([]byte)) != "\x01\x02" {
 		t.Errorf("bytes encode = %v", got)
+	}
+}
+
+// TestEncodeZeroNotNull guards the specific corruption where a zero-valued
+// scalar (int64(0), float64(0), or "") in an optional Parquet column was
+// written as SQL NULL. Encode must return a non-nil pointer for every
+// non-NULL cell, including zero values.
+func TestEncodeZeroNotNull(t *testing.T) {
+	if got, _ := Map("tinyint", false).Encode(value.Text("0")); got == nil || *got.(*int64) != 0 {
+		t.Errorf("int zero encode = %v, want non-nil pointer to 0", got)
+	}
+	if got, _ := Map("double", false).Encode(value.Text("0")); got == nil || *got.(*float64) != 0 {
+		t.Errorf("double zero encode = %v, want non-nil pointer to 0", got)
+	}
+	if got, _ := Map("varchar", false).Encode(value.Text("")); got == nil || *got.(*string) != "" {
+		t.Errorf("empty string encode = %v, want non-nil pointer to \"\"", got)
 	}
 }
 
