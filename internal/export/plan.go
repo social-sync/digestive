@@ -7,10 +7,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/social-sync/grimnir/internal/config"
-	"github.com/social-sync/grimnir/internal/source"
-	"github.com/social-sync/grimnir/internal/transform"
-	"github.com/social-sync/grimnir/internal/typemap"
+	"github.com/social-sync/digestive/internal/config"
+	"github.com/social-sync/digestive/internal/source"
+	"github.com/social-sync/digestive/internal/transform"
+	"github.com/social-sync/digestive/internal/typemap"
 )
 
 // columnPlan is the resolved plan for one column of a table.

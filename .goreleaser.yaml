@@ -1,20 +1,20 @@
-# GoReleaser configuration for grimnir.
+# GoReleaser configuration for digestive.
 # Docs: https://goreleaser.com
 #
 # Release locally with:  goreleaser release --clean
 # (CI runs this automatically on pushed git tags matching v*)
 version: 2
 
-project_name: grimnir
+project_name: digestive
 
 before:
   hooks:
     - go mod tidy
 
 builds:
-  - id: grimnir
+  - id: digestive
     main: .
-    binary: grimnir
+    binary: digestive
     env:
       - CGO_ENABLED=0
     goos:
@@ -29,12 +29,12 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X github.com/social-sync/grimnir/cmd.version={{.Version}}
-      - -X github.com/social-sync/grimnir/cmd.commit={{.Commit}}
-      - -X github.com/social-sync/grimnir/cmd.date={{.Date}}
+      - -X github.com/social-sync/digestive/cmd.version={{.Version}}
+      - -X github.com/social-sync/digestive/cmd.commit={{.Commit}}
+      - -X github.com/social-sync/digestive/cmd.date={{.Date}}
 
 archives:
-  - id: grimnir
+  - id: digestive
     # Explicit, lowercase, predictable names so install.sh can build URLs.
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
@@ -65,7 +65,7 @@ changelog:
 release:
   github:
     owner: social-sync
-    name: grimnir
+    name: digestive
   draft: false
   prerelease: auto
 
@@ -74,15 +74,15 @@ release:
 # Requires a token with write access to social-sync/homebrew-tap exposed as
 # the HOMEBREW_TAP_GITHUB_TOKEN env var (see the release workflow).
 homebrew_casks:
-  - name: grimnir
+  - name: digestive
     binaries:
-      - grimnir
+      - digestive
     repository:
       owner: social-sync
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Casks
-    homepage: "https://github.com/social-sync/grimnir"
+    homepage: "https://github.com/social-sync/digestive"
     description: "Single-binary database exporter with anonymisation"
     license: "MIT"
     # Skip cask updates for pre-release tags (e.g. v1.0.0-rc1).
@@ -93,5 +93,5 @@ homebrew_casks:
       post:
         install: |
           if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/grimnir"]
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/digestive"]
           end

@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/social-sync/grimnir/internal/config"
-	"github.com/social-sync/grimnir/internal/manifest"
-	"github.com/social-sync/grimnir/internal/source"
-	"github.com/social-sync/grimnir/internal/typemap"
-	"github.com/social-sync/grimnir/internal/value"
-	"github.com/social-sync/grimnir/internal/writer"
+	"github.com/social-sync/digestive/internal/config"
+	"github.com/social-sync/digestive/internal/manifest"
+	"github.com/social-sync/digestive/internal/source"
+	"github.com/social-sync/digestive/internal/typemap"
+	"github.com/social-sync/digestive/internal/value"
+	"github.com/social-sync/digestive/internal/writer"
 )
 
 // Options configures an export run.

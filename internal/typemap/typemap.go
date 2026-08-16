@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/social-sync/grimnir/internal/value"
+	"github.com/social-sync/digestive/internal/value"
 	"github.com/parquet-go/parquet-go"
 )
 

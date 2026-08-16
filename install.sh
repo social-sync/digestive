@@ -1,19 +1,19 @@
 #!/bin/sh
-# grimnir installer.
+# digestive installer.
 #
-#   curl -sSfL https://raw.githubusercontent.com/social-sync/grimnir/main/install.sh | sh
+#   curl -sSfL https://raw.githubusercontent.com/social-sync/digestive/main/install.sh | sh
 #
 # Downloads the release asset matching your OS/arch from GitHub, verifies its
-# SHA-256 checksum, and installs the `grimnir` binary.
+# SHA-256 checksum, and installs the `digestive` binary.
 #
 # Environment overrides:
-#   GRIMNIR_VERSION   tag to install (default: latest release, e.g. v1.2.3)
-#   GRIMNIR_BIN_DIR   install directory (default: /usr/local/bin, or ~/.local/bin
+#   DIGESTIVE_VERSION   tag to install (default: latest release, e.g. v1.2.3)
+#   DIGESTIVE_BIN_DIR   install directory (default: /usr/local/bin, or ~/.local/bin
 #                     if that is not writable)
 set -eu
 
-REPO="social-sync/grimnir"
-BINARY="grimnir"
+REPO="social-sync/digestive"
+BINARY="digestive"
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$1" >&2; }
 warn() { printf '\033[1;33mwarn:\033[0m %s\n' "$1" >&2; }
@@ -51,13 +51,13 @@ case "$arch" in
 esac
 
 # --- resolve version ---------------------------------------------------------
-VERSION="${GRIMNIR_VERSION:-}"
+VERSION="${DIGESTIVE_VERSION:-}"
 if [ -z "$VERSION" ]; then
   info "Resolving latest release..."
   # Ask GitHub for the latest release tag.
   VERSION=$($DL "https://api.github.com/repos/${REPO}/releases/latest" \
     | grep '"tag_name":' | head -n1 | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
-  [ -n "$VERSION" ] || err "could not determine latest version; set GRIMNIR_VERSION"
+  [ -n "$VERSION" ] || err "could not determine latest version; set DIGESTIVE_VERSION"
 fi
 # Version number without the leading "v" (matches the archive file name).
 NUM=${VERSION#v}
@@ -97,9 +97,9 @@ info "Extracting..."
 tar -xzf "$TMP/$ASSET" -C "$TMP" "$BINARY" || err "failed to extract $BINARY"
 chmod +x "$TMP/$BINARY"
 
-BIN_DIR="${GRIMNIR_BIN_DIR:-/usr/local/bin}"
+BIN_DIR="${DIGESTIVE_BIN_DIR:-/usr/local/bin}"
 if [ ! -d "$BIN_DIR" ] || [ ! -w "$BIN_DIR" ]; then
-  if [ -n "${GRIMNIR_BIN_DIR:-}" ]; then
+  if [ -n "${DIGESTIVE_BIN_DIR:-}" ]; then
     err "install dir not writable: $BIN_DIR"
   fi
   BIN_DIR="$HOME/.local/bin"

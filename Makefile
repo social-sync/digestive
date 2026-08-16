@@ -1,4 +1,4 @@
-BINARY := grimnir
+BINARY := digestive
 
 .PHONY: build test vet fmt clean
 

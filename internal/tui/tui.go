@@ -16,7 +16,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/social-sync/grimnir/internal/export"
+	"github.com/social-sync/digestive/internal/export"
 )
 
 // Run displays the progress UI while exec runs the export, and returns exec's
@@ -212,7 +212,7 @@ func (m *model) table(name string) *tableState {
 func (m model) View() string {
 	var b strings.Builder
 
-	title := styleTitle.Render("grimnir export")
+	title := styleTitle.Render("digestive export")
 	if m.runName != "" {
 		title += "  " + styleDim.Render(m.runName)
 	}

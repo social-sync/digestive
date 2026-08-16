@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/social-sync/grimnir/internal/manifest"
-	"github.com/social-sync/grimnir/internal/typemap"
-	"github.com/social-sync/grimnir/internal/value"
-	"github.com/social-sync/grimnir/internal/writer"
+	"github.com/social-sync/digestive/internal/manifest"
+	"github.com/social-sync/digestive/internal/typemap"
+	"github.com/social-sync/digestive/internal/value"
+	"github.com/social-sync/digestive/internal/writer"
 )
 
 // col describes one column for a test fixture: its source type and the raw

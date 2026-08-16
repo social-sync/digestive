@@ -1,4 +1,4 @@
-module github.com/social-sync/grimnir
+module github.com/social-sync/digestive
 
 go 1.26.4
 

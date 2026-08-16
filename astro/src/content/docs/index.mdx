@@ -1,5 +1,5 @@
 ---
-title: Grimnir
+title: Digestive
 description: A single-binary database exporter that anonymises, redacts, and deterministically hashes data on the way out.
 template: splash
 hero:
@@ -9,16 +9,16 @@ hero:
       link: /installation/
       icon: right-arrow
     - text: View on GitHub
-      link: https://github.com/social-sync/grimnir
+      link: https://github.com/social-sync/digestive
       icon: external
       variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Why Grimnir?
+## Why Digestive?
 
-Grimnir pulls tables from a SingleStore (MySQL-wire-compatible) database,
+Digestive pulls tables from a SingleStore (MySQL-wire-compatible) database,
 anonymises and redacts the sensitive columns, and writes the result as Parquet
 files plus a manifest — a sanitised, referentially-usable copy of production
 data for your dev, staging, and test environments.
