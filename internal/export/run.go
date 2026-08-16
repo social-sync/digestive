@@ -24,8 +24,12 @@ type Options struct {
 	Now time.Time
 	// DeleteOnFailure removes the run directory entirely if the run fails.
 	DeleteOnFailure bool
-	// Logger receives progress; defaults to a no-op logger.
+	// Logger receives diagnostic logging; defaults to a no-op logger.
 	Logger *slog.Logger
+	// Progress receives structured progress events for a live UI; defaults to
+	// a no-op reporter. Independent of Logger — a caller typically drives one
+	// or the other, not both.
+	Progress Reporter
 }
 
 // Validate resolves and checks the whole config against the live source
@@ -46,6 +50,11 @@ func Run(ctx context.Context, src source.Source, cfg *config.Config, opts Option
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
+	rep := opts.Progress
+	if rep == nil {
+		rep = nopReporter{}
+	}
+	runStart := time.Now()
 
 	if err := src.Ping(ctx); err != nil {
 		return "", fmt.Errorf("connect to source: %w", err)
@@ -65,6 +74,12 @@ func Run(ctx context.Context, src source.Source, cfg *config.Config, opts Option
 	}
 	log.Info("export starting", "run", runName, "dir", runDir, "tables", len(plans))
 
+	tableNames := make([]string, len(plans))
+	for i, plan := range plans {
+		tableNames[i] = plan.cfg.Name
+	}
+	rep.Start(runName, runDir, tableNames)
+
 	man := &manifest.Manifest{
 		Version:   manifest.Version,
 		RunID:     runName,
@@ -73,9 +88,12 @@ func Run(ctx context.Context, src source.Source, cfg *config.Config, opts Option
 	}
 
 	for _, plan := range plans {
-		table, err := exportTable(ctx, src, runDir, plan, log)
+		rep.TableStart(plan.cfg.Name)
+		tableStart := time.Now()
+		table, err := exportTable(ctx, src, runDir, plan, log, rep)
 		if err != nil {
 			log.Error("export failed", "table", plan.cfg.Name, "err", err)
+			rep.Failed(plan.cfg.Name, err)
 			if opts.DeleteOnFailure {
 				if rmErr := os.RemoveAll(runDir); rmErr != nil {
 					log.Error("cleanup failed", "dir", runDir, "err", rmErr)
@@ -87,6 +105,7 @@ func Run(ctx context.Context, src source.Source, cfg *config.Config, opts Option
 		}
 		man.Tables = append(man.Tables, table)
 		log.Info("table exported", "table", table.Name, "rows", table.Rows)
+		rep.TableDone(table.Name, table.Rows, time.Since(tableStart))
 	}
 
 	man.Complete = true
@@ -98,6 +117,7 @@ func Run(ctx context.Context, src source.Source, cfg *config.Config, opts Option
 	}
 
 	log.Info("export complete", "run", runName, "dir", runDir)
+	rep.Done(runName, runDir, time.Since(runStart))
 	return runDir, nil
 }
 
@@ -109,7 +129,7 @@ type fallbackReporter interface {
 
 // exportTable streams one table into a Parquet file and returns its Manifest
 // entry.
-func exportTable(ctx context.Context, src source.Source, runDir string, plan tablePlan, log *slog.Logger) (manifest.Table, error) {
+func exportTable(ctx context.Context, src source.Source, runDir string, plan tablePlan, log *slog.Logger, rep Reporter) (manifest.Table, error) {
 	fileName := plan.cfg.Name + ".parquet"
 
 	columns := make([]string, len(plan.columns))
@@ -138,6 +158,7 @@ func exportTable(ctx context.Context, src source.Source, runDir string, plan tab
 	}
 	defer rows.Close()
 
+	var written int64
 	for rows.Next() {
 		cells, err := rows.Scan()
 		if err != nil {
@@ -152,6 +173,10 @@ func exportTable(ctx context.Context, src source.Source, runDir string, plan tab
 		if err := pw.WriteRow(transformed); err != nil {
 			pw.Abort()
 			return manifest.Table{}, err
+		}
+		written++
+		if written%rowTickInterval == 0 {
+			rep.TableRows(plan.cfg.Name, written)
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -169,6 +194,8 @@ func exportTable(ctx context.Context, src source.Source, runDir string, plan tab
 			if n := fr.FallbackCount(); n > 0 {
 				log.Warn("json_anonymise redacted unparseable cells",
 					"table", plan.cfg.Name, "column", cp.col.Name, "cells", n)
+				rep.Warn(fmt.Sprintf("%s.%s: json_anonymise redacted %d unparseable cell(s)",
+					plan.cfg.Name, cp.col.Name, n))
 			}
 		}
 	}
