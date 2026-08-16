@@ -1,4 +1,4 @@
-// Package cmd implements the grimnir command-line interface.
+// Package cmd implements the digestive command-line interface.
 package cmd
 
 import (
@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/social-sync/grimnir/internal/config"
-	"github.com/social-sync/grimnir/internal/source"
+	"github.com/social-sync/digestive/internal/config"
+	"github.com/social-sync/digestive/internal/source"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -26,9 +26,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "grimnir",
+	Use:   "digestive",
 	Short: "Export and anonymise database tables to Parquet",
-	Long: "grimnir pulls tables from a SingleStore (MySQL-wire) database, " +
+	Long: "digestive pulls tables from a SingleStore (MySQL-wire) database, " +
 		"applies redaction and deterministic-hashing transforms, and writes the " +
 		"results to Parquet files plus a manifest for later reconstruction.",
 	Version:       fmt.Sprintf("%s (commit %s, built %s)", version, commit, date),

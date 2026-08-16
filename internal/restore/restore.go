@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/social-sync/grimnir/internal/manifest"
+	"github.com/social-sync/digestive/internal/manifest"
 	"github.com/parquet-go/parquet-go"
 )
 
@@ -60,7 +60,7 @@ func Run(opts Options) error {
 		return err
 	}
 	if man.Version > manifest.Version {
-		return fmt.Errorf("manifest version %d is newer than this binary understands (%d); upgrade grimnir",
+		return fmt.Errorf("manifest version %d is newer than this binary understands (%d); upgrade digestive",
 			man.Version, manifest.Version)
 	}
 	if !man.Complete && !opts.AllowIncomplete {
@@ -90,7 +90,7 @@ func Run(opts Options) error {
 }
 
 func writeHeader(w io.Writer, man *manifest.Manifest, d Dialect) {
-	fmt.Fprintf(w, "-- grimnir restore — run %s, exported %s, dialect %s\n", man.RunID, man.CreatedAt, d)
+	fmt.Fprintf(w, "-- digestive restore — run %s, exported %s, dialect %s\n", man.RunID, man.CreatedAt, d)
 	fmt.Fprintf(w, "-- source engine: %s\n\n", man.Source.Engine)
 }
 

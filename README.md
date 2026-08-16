@@ -1,4 +1,4 @@
-# Grimnir
+# Digestive
 
 A single-binary database exporter that pulls tables from a SingleStore
 (MySQL-wire-compatible) database, anonymises / redacts / deterministically
@@ -13,43 +13,43 @@ decisions are recorded in [docs/adr/](./docs/adr/).
 **Homebrew (macOS):**
 
 ```sh
-brew install social-sync/tap/grimnir
+brew install social-sync/tap/digestive
 ```
 
 **Install script (macOS / Linux):**
 
 ```sh
-curl -sSfL https://raw.githubusercontent.com/social-sync/grimnir/main/install.sh | sh
+curl -sSfL https://raw.githubusercontent.com/social-sync/digestive/main/install.sh | sh
 ```
 
 The script detects your OS/arch, verifies the SHA-256 checksum, and installs to
 `/usr/local/bin` (falling back to `~/.local/bin`). Override the target with
-`GRIMNIR_BIN_DIR=... ` or pin a version with `GRIMNIR_VERSION=v1.2.3`.
+`DIGESTIVE_BIN_DIR=... ` or pin a version with `DIGESTIVE_VERSION=v1.2.3`.
 
 **Manual:** download a prebuilt archive for your platform from the
-[releases page](https://github.com/social-sync/grimnir/releases), extract it,
-and put the `grimnir` binary on your `PATH`.
+[releases page](https://github.com/social-sync/digestive/releases), extract it,
+and put the `digestive` binary on your `PATH`.
 
 **Go:**
 
 ```sh
-go install github.com/social-sync/grimnir@latest
+go install github.com/social-sync/digestive@latest
 ```
 
 ## Build from source
 
 ```sh
-make build        # CGO-free static binary: ./grimnir
+make build        # CGO-free static binary: ./digestive
 make test
 ```
 
 ## Usage
 
 ```sh
-grimnir init                             # create starter .env + config.yaml (won't overwrite)
-grimnir validate --config config.yaml    # check config against live schema, no export
-grimnir export   --config config.yaml    # run the export
-grimnir restore  <run-dir> --dialect singlestore > dump.sql   # export run -> SQL INSERTs
+digestive init                             # create starter .env + config.yaml (won't overwrite)
+digestive validate --config config.yaml    # check config against live schema, no export
+digestive export   --config config.yaml    # run the export
+digestive restore  <run-dir> --dialect singlestore > dump.sql   # export run -> SQL INSERTs
 ```
 
 `init` writes a `config.yaml` and a `.env` containing a freshly generated
@@ -70,7 +70,7 @@ display (one line per table, with row counts and timings) that stays in
 scrollback when the run finishes. When stderr is piped or redirected (CI,
 `2>file`), or with `--no-tui` or `--log-level debug`, it falls back to plain
 structured logging. Either way the machine-readable run directory is printed on
-its own line to stdout, so `RUN=$(grimnir export)` keeps working.
+its own line to stdout, so `RUN=$(digestive export)` keeps working.
 
 Each run writes:
 
@@ -88,9 +88,9 @@ It reads **only** the run directory (manifest + Parquet); no config file, no
 database connection. Types are preserved for a same-engine round-trip.
 
 ```sh
-grimnir restore ./exports/20260814T150405Z --dialect singlestore > dump.sql
+digestive restore ./exports/20260814T150405Z --dialect singlestore > dump.sql
 # or stream straight into a client:
-grimnir restore ./exports/20260814T150405Z --dialect mysql | mysql -D mydb
+digestive restore ./exports/20260814T150405Z --dialect mysql | mysql -D mydb
 ```
 
 `restore` flags:

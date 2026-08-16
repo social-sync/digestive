@@ -1,9 +1,9 @@
 ---
 title: Configuration
-description: An exhaustive guide to the Grimnir config file.
+description: An exhaustive guide to the Digestive config file.
 ---
 
-Grimnir is driven by a single YAML file (`config.yaml` by default). This
+Digestive is driven by a single YAML file (`config.yaml` by default). This
 page documents every option.
 
 ## A complete example
@@ -55,7 +55,7 @@ Values are resolved from **real environment variables first**, then from a
 variables always win, so you can override a `.env` value on the command line:
 
 ```sh
-SINGLESTORE_DSN='...' ./grimnir export
+SINGLESTORE_DSN='...' ./digestive export
 ```
 
 :::caution[Substitution runs over the whole file, including comments]
@@ -251,9 +251,9 @@ Each run creates a sub-directory under `destination.directory`:
 ## Commands and flags
 
 ```sh
-grimnir init                 # scaffold config.yaml + .env
-grimnir validate             # check config against the live schema, no export
-grimnir export               # run the export
+digestive init                 # scaffold config.yaml + .env
+digestive validate             # check config against the live schema, no export
+digestive export               # run the export
 ```
 
 ### Global flags

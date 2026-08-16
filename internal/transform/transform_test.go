@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/social-sync/grimnir/internal/value"
+	"github.com/social-sync/digestive/internal/value"
 )
 
 func build(t *testing.T, spec Spec, key []byte) Transformer {

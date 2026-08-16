@@ -36,7 +36,7 @@ func TestModel_SuccessfulRunView(t *testing.T) {
 
 	view := m.View()
 	for _, want := range []string{
-		"grimnir export",
+		"digestive export",
 		"20260816T000000Z",
 		"users",
 		"orders",

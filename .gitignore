@@ -1,5 +1,5 @@
 # Compiled binary
-/grimnir
+/digestive
 
 # GoReleaser build output
 /dist/
@@ -7,7 +7,7 @@
 # Local secrets and env
 .env
 
-# Generated starter config (created by `grimnir init`)
+# Generated starter config (created by `digestive init`)
 /config.yaml
 
 # Export output

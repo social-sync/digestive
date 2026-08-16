@@ -13,10 +13,10 @@ loads into a copy of the database the export was read from.
 
 ```sh
 # Write a .sql file you can hand to a SQL editor:
-./grimnir restore ./exports/20260814T150405Z --dialect singlestore > dump.sql
+./digestive restore ./exports/20260814T150405Z --dialect singlestore > dump.sql
 
 # Or stream straight into a client:
-./grimnir restore ./exports/20260814T150405Z --dialect mysql | mysql -D mydb
+./digestive restore ./exports/20260814T150405Z --dialect mysql | mysql -D mydb
 ```
 
 The SQL goes to **stdout**; logs and warnings go to stderr, so redirecting or
@@ -50,7 +50,7 @@ Postgres) would hook in later. That mapping is not built yet.
 ## What the output looks like
 
 ```sql
--- grimnir restore — run 20260814T150405Z, exported 2026-08-14T15:04:05Z, dialect mysql
+-- digestive restore — run 20260814T150405Z, exported 2026-08-14T15:04:05Z, dialect mysql
 -- source engine: singlestore
 
 SET NAMES utf8mb4;
@@ -100,7 +100,7 @@ hand.
 - **Incomplete exports are refused.** If `manifest.json` reports
   `complete: false` (a partial run), `restore` stops rather than emit a
   dump that silently looks complete. Pass `--allow-incomplete` to override.
-- **Version and file checks are fatal.** A manifest written by a newer Grimnir
+- **Version and file checks are fatal.** A manifest written by a newer Digestive
   than your binary understands, or a Parquet file named in the manifest but
   missing from the directory, is a hard error.
 - **Row-count mismatch is a warning.** If a Parquet file holds a different

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/social-sync/grimnir/internal/value"
+	"github.com/social-sync/digestive/internal/value"
 )
 
 // decode parses JSON into a comparable Go value so tests can assert on structure

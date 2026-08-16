@@ -4,10 +4,10 @@ import starlight from '@astrojs/starlight';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://grimnir.danmatthews.me',
+	site: 'https://digestive.socialsync.tools',
 	integrations: [
 		starlight({
-			title: 'Grimnir',
+			title: 'Digestive',
 			description:
 				'A single-binary database exporter that anonymises, redacts, and ' +
 				'deterministically hashes data on the way out.',
@@ -15,7 +15,7 @@ export default defineConfig({
 				{
 					icon: 'github',
 					label: 'GitHub',
-					href: 'https://github.com/social-sync/grimnir',
+					href: 'https://github.com/social-sync/digestive',
 				},
 			],
 			sidebar: [
