@@ -8,7 +8,35 @@ a **manifest** describing how to reconstruct exact `INSERT`s later.
 The domain model lives in [CONTEXT.md](./CONTEXT.md); the load-bearing design
 decisions are recorded in [docs/adr/](./docs/adr/).
 
-## Build
+## Install
+
+**Homebrew (macOS):**
+
+```sh
+brew install social-sync/tap/grimnir
+```
+
+**Install script (macOS / Linux):**
+
+```sh
+curl -sSfL https://raw.githubusercontent.com/social-sync/grimnir/main/install.sh | sh
+```
+
+The script detects your OS/arch, verifies the SHA-256 checksum, and installs to
+`/usr/local/bin` (falling back to `~/.local/bin`). Override the target with
+`GRIMNIR_BIN_DIR=... ` or pin a version with `GRIMNIR_VERSION=v1.2.3`.
+
+**Manual:** download a prebuilt archive for your platform from the
+[releases page](https://github.com/social-sync/grimnir/releases), extract it,
+and put the `grimnir` binary on your `PATH`.
+
+**Go:**
+
+```sh
+go install github.com/social-sync/grimnir@latest
+```
+
+## Build from source
 
 ```sh
 make build        # CGO-free static binary: ./grimnir
@@ -144,3 +172,7 @@ faker** family (plausible fake names/addresses), remote destinations, and
 FK-aware subsetting are **deferred but designed for** — see the ADRs. Structural
 JSON anonymisation (`json_anonymise`) is implemented; faker-backed *realistic*
 leaf values are the deferred part.
+
+## License
+
+Licensed under the [MIT License](./LICENSE).

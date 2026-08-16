@@ -1,6 +1,9 @@
 # Compiled binary
 /grimnir
 
+# GoReleaser build output
+/dist/
+
 # Local secrets and env
 .env
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/danmatthews/grimnir/internal/value"
+	"github.com/social-sync/grimnir/internal/value"
 )
 
 // jsonAnonymiser anonymises the values inside a JSON document in place, keeping

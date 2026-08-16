@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/danmatthews/grimnir/internal/export"
+	"github.com/social-sync/grimnir/internal/export"
 	"github.com/spf13/cobra"
 )
 

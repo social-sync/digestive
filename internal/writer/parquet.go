@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/danmatthews/grimnir/internal/typemap"
-	"github.com/danmatthews/grimnir/internal/value"
+	"github.com/social-sync/grimnir/internal/typemap"
+	"github.com/social-sync/grimnir/internal/value"
 	"github.com/parquet-go/parquet-go"
 )
 

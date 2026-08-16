@@ -6,7 +6,7 @@ package source
 import (
 	"context"
 
-	"github.com/danmatthews/grimnir/internal/value"
+	"github.com/social-sync/grimnir/internal/value"
 )
 
 // Column describes one column of a source table, as read from the database's

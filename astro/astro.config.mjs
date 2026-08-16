@@ -15,7 +15,7 @@ export default defineConfig({
 				{
 					icon: 'github',
 					label: 'GitHub',
-					href: 'https://github.com/danmatthews/grimnir',
+					href: 'https://github.com/social-sync/grimnir',
 				},
 			],
 			sidebar: [

@@ -1,12 +1,42 @@
 ---
 title: Installation
-description: Clone, build, and scaffold a config for Grimnir.
+description: Install Grimnir via Homebrew, the install script, or from source, and scaffold a config.
 ---
 
-Grimnir is distributed as source for now. You clone the repository, build
-a single static binary, and run `init` to scaffold your configuration.
+Grimnir ships as a single self-contained binary. Install a prebuilt release
+with Homebrew or the install script, or build from source. Then run `init` to
+scaffold your configuration.
 
-## Prerequisites
+## Install a prebuilt binary
+
+**Homebrew (macOS):**
+
+```sh
+brew install social-sync/tap/grimnir
+```
+
+**Install script (macOS / Linux):**
+
+```sh
+curl -sSfL https://raw.githubusercontent.com/social-sync/grimnir/main/install.sh | sh
+```
+
+The script detects your OS and architecture, downloads the matching release
+asset, verifies its SHA-256 checksum, and installs `grimnir` to
+`/usr/local/bin` (falling back to `~/.local/bin`). Set `GRIMNIR_BIN_DIR` to
+choose the target directory, or `GRIMNIR_VERSION=v1.2.3` to pin a version.
+
+**Manual:** grab an archive for your platform from the
+[releases page](https://github.com/social-sync/grimnir/releases), extract it,
+and put the `grimnir` binary on your `PATH`.
+
+Once installed, skip ahead to [Scaffold a config](#scaffold-a-config).
+
+## Build from source
+
+Prefer building yourself? Read on.
+
+### Prerequisites
 
 - **Go 1.26 or newer** (the module targets Go 1.26). Check with `go version`.
 - Network access to your source database (SingleStore, or any MySQL-wire-compatible database).
@@ -14,10 +44,10 @@ a single static binary, and run `init` to scaffold your configuration.
 No C toolchain is required — the build is pure Go (`CGO_ENABLED=0`), so it
 produces one self-contained binary with no runtime dependencies.
 
-## Clone and build
+### Clone and build
 
 ```sh
-git clone https://github.com/danmatthews/grimnir.git
+git clone https://github.com/social-sync/grimnir.git
 cd grimnir
 
 # Build the single static binary into ./grimnir
@@ -28,7 +58,7 @@ make build
 that directly, or install it onto your `PATH`:
 
 ```sh
-go install github.com/danmatthews/grimnir@latest
+go install github.com/social-sync/grimnir@latest
 ```
 
 Verify it works:

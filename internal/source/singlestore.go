@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/danmatthews/grimnir/internal/value"
+	"github.com/social-sync/grimnir/internal/value"
 	_ "github.com/go-sql-driver/mysql"
 )
 

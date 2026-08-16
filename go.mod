@@ -1,4 +1,4 @@
-module github.com/danmatthews/grimnir
+module github.com/social-sync/grimnir
 
 go 1.26.4
 

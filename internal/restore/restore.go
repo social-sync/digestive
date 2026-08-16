@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/danmatthews/grimnir/internal/manifest"
+	"github.com/social-sync/grimnir/internal/manifest"
 	"github.com/parquet-go/parquet-go"
 )
 

@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/danmatthews/grimnir/internal/config"
-	"github.com/danmatthews/grimnir/internal/manifest"
-	"github.com/danmatthews/grimnir/internal/source"
-	"github.com/danmatthews/grimnir/internal/typemap"
-	"github.com/danmatthews/grimnir/internal/value"
-	"github.com/danmatthews/grimnir/internal/writer"
+	"github.com/social-sync/grimnir/internal/config"
+	"github.com/social-sync/grimnir/internal/manifest"
+	"github.com/social-sync/grimnir/internal/source"
+	"github.com/social-sync/grimnir/internal/typemap"
+	"github.com/social-sync/grimnir/internal/value"
+	"github.com/social-sync/grimnir/internal/writer"
 )
 
 // Options configures an export run.
