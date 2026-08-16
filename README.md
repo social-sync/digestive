@@ -34,6 +34,15 @@ already exists it fails and writes nothing. Edit `.env` to set your
 - `--run-name NAME` — name the run directory (default: UTC timestamp).
 - `--delete-on-failure` — remove the whole run directory if the export fails,
   so repeated failures don't accumulate partial output.
+- `--no-tui` — disable the live progress UI and emit plain structured log lines
+  instead.
+
+When stderr is an interactive terminal, `export` renders a live progress
+display (one line per table, with row counts and timings) that stays in
+scrollback when the run finishes. When stderr is piped or redirected (CI,
+`2>file`), or with `--no-tui` or `--log-level debug`, it falls back to plain
+structured logging. Either way the machine-readable run directory is printed on
+its own line to stdout, so `RUN=$(grimnir export)` keeps working.
 
 Each run writes:
 

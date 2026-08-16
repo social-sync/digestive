@@ -10,6 +10,7 @@ import (
 	"github.com/danmatthews/grimnir/internal/config"
 	"github.com/danmatthews/grimnir/internal/source"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 var (
@@ -54,6 +55,13 @@ func newLogger() *slog.Logger {
 		level = slog.LevelInfo
 	}
 	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+}
+
+// stderrIsTerminal reports whether stderr is an interactive terminal, where a
+// live TUI makes sense. It is false when stderr is piped or redirected (CI,
+// `2>file`, etc.), so those runs get plain logging.
+func stderrIsTerminal() bool {
+	return term.IsTerminal(int(os.Stderr.Fd()))
 }
 
 // loadConfigAndOpen loads the config and opens the source connection. The
