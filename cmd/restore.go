@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/danmatthews/grimnir/internal/restore"
+	"github.com/social-sync/grimnir/internal/restore"
 	"github.com/spf13/cobra"
 )
 

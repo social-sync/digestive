@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/danmatthews/grimnir/internal/config"
-	"github.com/danmatthews/grimnir/internal/export"
-	"github.com/danmatthews/grimnir/internal/source"
-	"github.com/danmatthews/grimnir/internal/tui"
+	"github.com/social-sync/grimnir/internal/config"
+	"github.com/social-sync/grimnir/internal/export"
+	"github.com/social-sync/grimnir/internal/source"
+	"github.com/social-sync/grimnir/internal/tui"
 	"github.com/spf13/cobra"
 )
 

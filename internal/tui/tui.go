@@ -16,7 +16,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/danmatthews/grimnir/internal/export"
+	"github.com/social-sync/grimnir/internal/export"
 )
 
 // Run displays the progress UI while exec runs the export, and returns exec's

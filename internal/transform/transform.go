@@ -10,7 +10,7 @@ package transform
 import (
 	"fmt"
 
-	"github.com/danmatthews/grimnir/internal/value"
+	"github.com/social-sync/grimnir/internal/value"
 )
 
 // Names of the built-in transforms, as written in config.

@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/danmatthews/grimnir/internal/value"
+	"github.com/social-sync/grimnir/internal/value"
 )
 
 // hasher computes a keyed, deterministic pseudonym for a value. It is global

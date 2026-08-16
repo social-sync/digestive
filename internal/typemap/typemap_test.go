@@ -3,7 +3,7 @@ package typemap
 import (
 	"testing"
 
-	"github.com/danmatthews/grimnir/internal/value"
+	"github.com/social-sync/grimnir/internal/value"
 )
 
 func TestMap(t *testing.T) {

@@ -1,0 +1,97 @@
+# GoReleaser configuration for grimnir.
+# Docs: https://goreleaser.com
+#
+# Release locally with:  goreleaser release --clean
+# (CI runs this automatically on pushed git tags matching v*)
+version: 2
+
+project_name: grimnir
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: grimnir
+    main: .
+    binary: grimnir
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # Trim paths and strip debug info for smaller, reproducible binaries.
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/social-sync/grimnir/cmd.version={{.Version}}
+      - -X github.com/social-sync/grimnir/cmd.commit={{.Commit}}
+      - -X github.com/social-sync/grimnir/cmd.date={{.Date}}
+
+archives:
+  - id: grimnir
+    # Explicit, lowercase, predictable names so install.sh can build URLs.
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    # Windows users expect zip.
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge branch"
+
+release:
+  github:
+    owner: social-sync
+    name: grimnir
+  draft: false
+  prerelease: auto
+
+# Auto-generate and commit a Homebrew cask to the tap repo on each release.
+# Casks are macOS-only; Linux users install via install.sh or the raw binary.
+# Requires a token with write access to social-sync/homebrew-tap exposed as
+# the HOMEBREW_TAP_GITHUB_TOKEN env var (see the release workflow).
+homebrew_casks:
+  - name: grimnir
+    binaries:
+      - grimnir
+    repository:
+      owner: social-sync
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Casks
+    homepage: "https://github.com/social-sync/grimnir"
+    description: "Single-binary database exporter with anonymisation"
+    license: "MIT"
+    # Skip cask updates for pre-release tags (e.g. v1.0.0-rc1).
+    skip_upload: auto
+    # Strip the macOS quarantine flag so the unsigned binary runs without a
+    # Gatekeeper prompt.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/grimnir"]
+          end

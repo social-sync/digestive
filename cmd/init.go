@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/danmatthews/grimnir/internal/templates"
+	"github.com/social-sync/grimnir/internal/templates"
 	"github.com/spf13/cobra"
 )
 
