@@ -69,6 +69,14 @@ func (m Mapping) Node() parquet.Node {
 
 // Encode converts a raw cell into the Go value the Parquet writer expects for
 // this mapping. NULL becomes nil.
+//
+// Scalar values are returned as pointers (*int64, *float64, *string) rather
+// than bare values. All columns are optional (see Node), and parquet-go's
+// reflection path treats a Go zero value in an optional column as SQL NULL —
+// so a bare int64(0), float64(0), or "" would be written as NULL, silently
+// corrupting the data. A non-nil pointer is always non-null; only nil is NULL.
+// Byte slices already distinguish nil (NULL) from an empty-but-non-nil slice,
+// so they need no pointer.
 func (m Mapping) Encode(v value.Value) (any, error) {
 	if v.Null {
 		return nil, nil
@@ -79,19 +87,20 @@ func (m Mapping) Encode(v value.Value) (any, error) {
 		if err != nil {
 			return nil, fmt.Errorf("value %q is not a valid int64: %w", v.String(), err)
 		}
-		return n, nil
+		return &n, nil
 	case KindDouble:
 		f, err := strconv.ParseFloat(strings.TrimSpace(v.String()), 64)
 		if err != nil {
 			return nil, fmt.Errorf("value %q is not a valid float64: %w", v.String(), err)
 		}
-		return f, nil
+		return &f, nil
 	case KindBytes:
 		b := make([]byte, len(v.Bytes))
 		copy(b, v.Bytes)
 		return b, nil
 	default: // KindString
-		return v.String(), nil
+		s := v.String()
+		return &s, nil
 	}
 }
 
