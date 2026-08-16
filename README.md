@@ -92,9 +92,9 @@ It reads **only** the run directory (manifest + Parquet); no config file, no
 database connection. Types are preserved for a same-engine round-trip.
 
 ```sh
-digestive restore ./exports/20260814T150405Z --dialect singlestore > dump.sql
+digestive restore ./exports/2026-08-14T15-04-05Z --dialect singlestore > dump.sql
 # or stream straight into a client:
-digestive restore ./exports/20260814T150405Z --dialect mysql | mysql -D mydb
+digestive restore ./exports/2026-08-14T15-04-05Z --dialect mysql | mysql -D mydb
 ```
 
 `restore` flags:

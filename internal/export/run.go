@@ -66,7 +66,7 @@ func Run(ctx context.Context, src source.Source, cfg *config.Config, opts Option
 
 	runName := opts.RunName
 	if runName == "" {
-		runName = opts.Now.UTC().Format("20060102T150405Z")
+		runName = opts.Now.UTC().Format("2006-01-02T15-04-05Z")
 	}
 	runDir := filepath.Join(cfg.Destination.Directory, runName)
 	if err := os.MkdirAll(runDir, 0o755); err != nil {

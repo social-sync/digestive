@@ -13,10 +13,10 @@ loads into a copy of the database the export was read from.
 
 ```sh
 # Write a .sql file you can hand to a SQL editor:
-./digestive restore ./exports/20260814T150405Z --dialect singlestore > dump.sql
+./digestive restore ./exports/2026-08-14T15-04-05Z --dialect singlestore > dump.sql
 
 # Or stream straight into a client:
-./digestive restore ./exports/20260814T150405Z --dialect mysql | mysql -D mydb
+./digestive restore ./exports/2026-08-14T15-04-05Z --dialect mysql | mysql -D mydb
 ```
 
 The SQL goes to **stdout**; logs and warnings go to stderr, so redirecting or
@@ -50,7 +50,7 @@ Postgres) would hook in later. That mapping is not built yet.
 ## What the output looks like
 
 ```sql
--- digestive restore — run 20260814T150405Z, exported 2026-08-14T15:04:05Z, dialect mysql
+-- digestive restore — run 2026-08-14T15-04-05Z, exported 2026-08-14T15:04:05Z, dialect mysql
 -- source engine: singlestore
 
 SET NAMES utf8mb4;

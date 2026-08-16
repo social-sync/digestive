@@ -239,7 +239,7 @@ Each run creates a sub-directory under `destination.directory`:
   orders.parquet
 ```
 
-- **Run name** defaults to a UTC timestamp (e.g. `20260814T150405Z`); override
+- **Run name** defaults to a UTC timestamp (e.g. `2026-08-14T15-04-05Z`); override
   it with `--run-name`.
 - **`manifest.json`** records, per table, the ordered columns, their source
   types, nullability, the Parquet type chosen, and any transform applied. It is
