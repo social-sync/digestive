@@ -1,0 +1,7 @@
+# laravel: enum
+# engine: mysql
+# source_type: enum | parquet: BYTE_ARRAY(STRING) | lossless: false
+# note: EDGE: an enum member that itself contains a comma.
+---
+"a"
+"c,d"

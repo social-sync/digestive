@@ -1,0 +1,7 @@
+# laravel: char
+# engine: mysql
+# source_type: char | parquet: BYTE_ARRAY(STRING) | lossless: false
+---
+"abc"
+""
+"😀"

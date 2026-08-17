@@ -1,0 +1,8 @@
+# laravel: decimal
+# engine: mysql
+# source_type: decimal | parquet: BYTE_ARRAY(STRING) | lossless: true
+# note: EDGE: precision/scale preserved as text; trailing zeros must survive.
+---
+"0.000"
+"10.500"
+"-12.345"

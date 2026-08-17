@@ -1,0 +1,5 @@
+# laravel: macAddress
+# engine: mysql
+# source_type: varchar | parquet: BYTE_ARRAY(STRING) | lossless: false
+---
+"00:1b:63:84:45:e6"

@@ -1,0 +1,6 @@
+# laravel: unsignedSmallInteger
+# engine: mysql
+# source_type: smallint unsigned | parquet: INT64 | lossless: false
+---
+"0"
+"65535"

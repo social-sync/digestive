@@ -1,0 +1,7 @@
+# laravel: text
+# engine: mysql
+# source_type: text | parquet: BYTE_ARRAY(STRING) | lossless: false
+---
+"hello world"
+""
+NULL

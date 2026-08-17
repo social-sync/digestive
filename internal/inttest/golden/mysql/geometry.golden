@@ -1,0 +1,6 @@
+# laravel: geometry
+# engine: mysql
+# source_type: geometry | parquet: BYTE_ARRAY | lossless: true
+# note: EDGE: MySQL spatial type names are NOT in typemap's switch, so they hit the raw-bytes default. Round-trips as WKB bytes; documented as a known gap.
+---
+hex:000000000101000000000000000000F03F0000000000000040

@@ -1,0 +1,8 @@
+# laravel: set
+# engine: mysql
+# source_type: set | parquet: BYTE_ARRAY(STRING) | lossless: false
+# note: EDGE: multi-member and empty SET.
+---
+"a"
+"a,b"
+""

@@ -1,0 +1,6 @@
+# laravel: ipAddress
+# engine: mysql
+# source_type: varchar | parquet: BYTE_ARRAY(STRING) | lossless: false
+---
+"192.168.0.1"
+"::1"

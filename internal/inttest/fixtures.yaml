@@ -1,0 +1,220 @@
+# Laravel column-type coverage for digestive's export → restore round-trip.
+#
+# Each entry pins ONE Laravel schema-builder migration method to the underlying
+# SQL column type digestive actually sees (via INFORMATION_SCHEMA.DATA_TYPE) and
+# a handful of representative values — deliberately including the awkward ones,
+# because those are what we want to characterise and document for users.
+#
+# Fields:
+#   laravel          - the Laravel migration method this row stands for. Aliases
+#                      that collapse to the same underlying type are listed in
+#                      `aka` rather than given their own row.
+#   aka              - other Laravel methods that produce the same column type.
+#   ddl              - the column definition, as Laravel's MySQL grammar emits it.
+#   ddl_mysql        - overrides `ddl` for the MySQL engine only.
+#   ddl_singlestore  - overrides `ddl` for the SingleStore engine only.
+#   skip_mysql       - if set, the MySQL leg is skipped with this reason.
+#   skip_singlestore - if set, the SingleStore leg is skipped with this reason.
+#   values           - raw SQL value expressions, one per row, inserted verbatim
+#                      into `INSERT INTO t (rn, val) VALUES (<i>, <expr>)`.
+#                      Use NULL for SQL NULL, X'..' for binary, ST_GeomFromText
+#                      for spatial, etc.
+#   note             - free-text characterisation note, surfaced in the docs.
+#
+# The harness inserts these, exports to Parquet, restores to SQL, reloads, and
+# reads the values back. See ../../README.md "How the dialect tests are measured".
+
+types:
+  # ── Integer family ────────────────────────────────────────────────────────
+  - laravel: tinyInteger
+    ddl: "TINYINT"
+    values: ["-128", "0", "127", "NULL"]
+
+  - laravel: unsignedTinyInteger
+    ddl: "TINYINT UNSIGNED"
+    values: ["0", "255"]
+
+  - laravel: boolean
+    ddl: "TINYINT(1)"
+    aka: ["bool"]
+    values: ["0", "1"]
+    note: "Laravel boolean is TINYINT(1); stored as 0/1."
+
+  - laravel: smallInteger
+    ddl: "SMALLINT"
+    values: ["-32768", "0", "32767"]
+
+  - laravel: unsignedSmallInteger
+    ddl: "SMALLINT UNSIGNED"
+    values: ["0", "65535"]
+
+  - laravel: mediumInteger
+    ddl: "MEDIUMINT"
+    values: ["-8388608", "0", "8388607"]
+
+  - laravel: unsignedMediumInteger
+    ddl: "MEDIUMINT UNSIGNED"
+    values: ["0", "16777215"]
+
+  - laravel: integer
+    ddl: "INT"
+    aka: ["increments (INT UNSIGNED AUTO_INCREMENT)"]
+    values: ["-2147483648", "0", "2147483647"]
+
+  - laravel: unsignedInteger
+    ddl: "INT UNSIGNED"
+    values: ["0", "4294967295"]
+
+  - laravel: bigInteger
+    ddl: "BIGINT"
+    values: ["-9223372036854775808", "0", "9223372036854775807"]
+
+  - laravel: unsignedBigInteger
+    ddl: "BIGINT UNSIGNED"
+    aka: ["id", "foreignId", "foreignIdFor", "morphs (…_id)"]
+    values: ["0", "9223372036854775807", "18446744073709551615"]
+    note: >-
+      EDGE: the max unsigned value (18446744073709551615) exceeds signed INT64,
+      so typemap stores this column losslessly as text rather than INT64.
+
+  # ── Fixed / floating point ────────────────────────────────────────────────
+  - laravel: decimal
+    ddl: "DECIMAL(12,3)"
+    values: ["'0.000'", "'10.500'", "'-12.345'"]
+    note: "EDGE: precision/scale preserved as text; trailing zeros must survive."
+
+  - laravel: float
+    ddl: "FLOAT"
+    values: ["'1.5'", "'0'", "'-0.5'"]
+
+  - laravel: double
+    ddl: "DOUBLE"
+    values: ["'1.5'", "'0'", "'-0.0'", "'3.141592653589793'"]
+    note: "EDGE: negative zero and high-precision fractions."
+
+  # ── Character / text ──────────────────────────────────────────────────────
+  - laravel: char
+    ddl: "CHAR(10)"
+    values: ["'abc'", "''", "'😀'"]
+
+  - laravel: string
+    ddl: "VARCHAR(255)"
+    values: ["'hello'", "''", "'O''Brien\n'", "'😀 4-byte 𝕏'"]
+    note: "EDGE: empty string vs NULL, embedded quote/newline, 4-byte UTF-8."
+
+  - laravel: uuid
+    ddl: "CHAR(36)"
+    aka: ["foreignUuid", "uuidMorphs (…_id)"]
+    values: ["'550e8400-e29b-41d4-a716-446655440000'"]
+
+  - laravel: ulid
+    ddl: "CHAR(26)"
+    aka: ["foreignUlid", "ulidMorphs (…_id)"]
+    values: ["'01ARZ3NDEKTSV4RRFFQ69G5FAV'"]
+
+  - laravel: ipAddress
+    ddl: "VARCHAR(45)"
+    values: ["'192.168.0.1'", "'::1'"]
+
+  - laravel: macAddress
+    ddl: "VARCHAR(17)"
+    values: ["'00:1b:63:84:45:e6'"]
+
+  - laravel: rememberToken
+    ddl: "VARCHAR(100)"
+    values: ["'tok_abc123'", "NULL"]
+
+  - laravel: tinyText
+    ddl: "TINYTEXT"
+    values: ["'x'", "''"]
+
+  - laravel: text
+    ddl: "TEXT"
+    aka: ["morphs (…_type is VARCHAR)"]
+    values: ["'hello world'", "''", "NULL"]
+
+  - laravel: mediumText
+    ddl: "MEDIUMTEXT"
+    values: ["'medium'"]
+
+  - laravel: longText
+    ddl: "LONGTEXT"
+    values: ["'long'"]
+
+  - laravel: enum
+    ddl: "ENUM('a','b','c,d')"
+    values: ["'a'", "'c,d'"]
+    note: "EDGE: an enum member that itself contains a comma."
+    skip_singlestore: "confirm SingleStore ENUM support on your target version"
+
+  - laravel: set
+    ddl: "SET('a','b','c')"
+    values: ["'a'", "'a,b'", "''"]
+    note: "EDGE: multi-member and empty SET."
+    skip_singlestore: "confirm SingleStore SET support on your target version"
+
+  # ── Temporal ──────────────────────────────────────────────────────────────
+  - laravel: date
+    ddl: "DATE"
+    values: ["'2026-08-17'", "'0000-00-00'"]
+    note: "EDGE: MySQL zero-date; stored losslessly as text."
+
+  - laravel: dateTime
+    ddl: "DATETIME"
+    aka: ["dateTimeTz (no TZ stored on MySQL)"]
+    values: ["'2026-08-17 12:34:56'", "'0000-00-00 00:00:00'"]
+    note: "EDGE: zero datetime."
+
+  - laravel: timestamp
+    ddl: "TIMESTAMP NULL"
+    aka: ["timestampTz", "timestamps", "softDeletes"]
+    values: ["'2026-08-17 12:34:56'", "'1970-01-01 00:00:01'", "NULL"]
+    note: "TIMESTAMP range excludes zero-dates and pre-1970 values."
+
+  - laravel: time
+    ddl: "TIME"
+    aka: ["timeTz"]
+    values: ["'12:34:56'", "'00:00:00'"]
+
+  - laravel: year
+    ddl: "YEAR"
+    values: ["'2026'", "'1901'", "'2155'"]
+
+  # ── Binary ────────────────────────────────────────────────────────────────
+  - laravel: binary
+    ddl: "BLOB"
+    aka: ["binary(length) → VARBINARY"]
+    values: ["X'DEADBEEF'", "X''", "NULL"]
+    note: "EDGE: empty-but-non-null blob must stay distinct from NULL."
+
+  # ── JSON ──────────────────────────────────────────────────────────────────
+  - laravel: json
+    ddl: "JSON"
+    aka: ["jsonb (aliased to JSON on MySQL)"]
+    values: ["'{\"b\":1,\"a\":2}'", "'[1,2,3]'", "'null'"]
+    note: >-
+      EDGE: engines normalise JSON (key order, whitespace); the golden records
+      the engine's canonical form so we can tell users what to expect.
+
+  # ── Spatial (MySQL GEOMETRY family; SingleStore uses GEOGRAPHY, not tested) ─
+  - laravel: geometry
+    ddl: "GEOMETRY"
+    aka: ["geometryCollection", "multiPoint", "multiPolygon"]
+    values: ["ST_GeomFromText('POINT(1 2)')"]
+    skip_singlestore: "SingleStore has no GEOMETRY type (uses GEOGRAPHY/GEOGRAPHYPOINT)"
+    note: >-
+      EDGE: MySQL spatial type names are NOT in typemap's switch, so they hit the
+      raw-bytes default. Round-trips as WKB bytes; documented as a known gap.
+
+  - laravel: point
+    ddl: "POINT"
+    aka: ["lineString", "polygon", "multiLineString"]
+    values: ["ST_GeomFromText('POINT(1 2)')"]
+    skip_singlestore: "SingleStore has no POINT type (uses GEOGRAPHYPOINT)"
+
+  # ── Vector (Laravel 12+) ──────────────────────────────────────────────────
+  - laravel: vector
+    ddl_singlestore: "VECTOR(3)"
+    skip_mysql: "VECTOR requires MySQL 9+; default test image is 8.x"
+    values: ["'[0.1,0.2,0.3]'"]
+    note: "SingleStore-native VECTOR; typemap stores it losslessly as text."

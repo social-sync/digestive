@@ -1,0 +1,7 @@
+# laravel: year
+# engine: mysql
+# source_type: year | parquet: BYTE_ARRAY(STRING) | lossless: true
+---
+"2026"
+"1901"
+"2155"

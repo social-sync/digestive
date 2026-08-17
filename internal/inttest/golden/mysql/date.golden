@@ -1,0 +1,7 @@
+# laravel: date
+# engine: mysql
+# source_type: date | parquet: BYTE_ARRAY(STRING) | lossless: true
+# note: EDGE: MySQL zero-date; stored losslessly as text.
+---
+"2026-08-17"
+"0000-00-00"

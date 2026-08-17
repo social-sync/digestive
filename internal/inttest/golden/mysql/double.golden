@@ -1,0 +1,9 @@
+# laravel: double
+# engine: mysql
+# source_type: double | parquet: DOUBLE | lossless: false
+# note: EDGE: negative zero and high-precision fractions.
+---
+"1.5"
+"0"
+"-0"
+"3.141592653589793"
