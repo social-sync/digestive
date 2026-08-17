@@ -1,0 +1,9 @@
+# laravel: string
+# engine: mysql
+# source_type: varchar | parquet: BYTE_ARRAY(STRING) | lossless: false
+# note: EDGE: empty string vs NULL, embedded quote/newline, 4-byte UTF-8.
+---
+"hello"
+""
+"O'Brien\n"
+"😀 4-byte 𝕏"

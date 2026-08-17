@@ -1,0 +1,8 @@
+# laravel: unsignedBigInteger
+# engine: mysql
+# source_type: bigint unsigned | parquet: BYTE_ARRAY(STRING) | lossless: true
+# note: EDGE: the max unsigned value (18446744073709551615) exceeds signed INT64, so typemap stores this column losslessly as text rather than INT64.
+---
+"0"
+"9223372036854775807"
+"18446744073709551615"

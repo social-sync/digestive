@@ -1,0 +1,6 @@
+# laravel: unsignedMediumInteger
+# engine: mysql
+# source_type: mediumint unsigned | parquet: INT64 | lossless: false
+---
+"0"
+"16777215"

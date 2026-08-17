@@ -1,0 +1,6 @@
+# laravel: rememberToken
+# engine: mysql
+# source_type: varchar | parquet: BYTE_ARRAY(STRING) | lossless: false
+---
+"tok_abc123"
+NULL

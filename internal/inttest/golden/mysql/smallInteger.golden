@@ -1,0 +1,7 @@
+# laravel: smallInteger
+# engine: mysql
+# source_type: smallint | parquet: INT64 | lossless: false
+---
+"-32768"
+"0"
+"32767"

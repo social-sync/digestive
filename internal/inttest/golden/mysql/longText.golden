@@ -1,0 +1,5 @@
+# laravel: longText
+# engine: mysql
+# source_type: longtext | parquet: BYTE_ARRAY(STRING) | lossless: false
+---
+"long"

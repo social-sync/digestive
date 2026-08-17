@@ -1,0 +1,6 @@
+# laravel: tinyText
+# engine: mysql
+# source_type: tinytext | parquet: BYTE_ARRAY(STRING) | lossless: false
+---
+"x"
+""

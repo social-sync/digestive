@@ -1,0 +1,7 @@
+# laravel: float
+# engine: mysql
+# source_type: float | parquet: DOUBLE | lossless: false
+---
+"1.5"
+"0"
+"-0.5"

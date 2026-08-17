@@ -1,0 +1,7 @@
+# laravel: bigInteger
+# engine: mysql
+# source_type: bigint | parquet: INT64 | lossless: false
+---
+"-9223372036854775808"
+"0"
+"9223372036854775807"

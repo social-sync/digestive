@@ -1,0 +1,5 @@
+# laravel: ulid
+# engine: mysql
+# source_type: char | parquet: BYTE_ARRAY(STRING) | lossless: false
+---
+"01ARZ3NDEKTSV4RRFFQ69G5FAV"

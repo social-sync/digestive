@@ -176,6 +176,62 @@ manifest records the source type and whether the column was stored losslessly.
 Only text columns (`char`/`varchar`/`*text`/`enum`/`set`) may be hashed or
 masked; the tool rejects a config that targets any other type.
 
+## How the dialect tests are measured
+
+The table above is a claim; `internal/inttest` is how we verify it. It's a
+Docker-backed, **same-engine** round-trip suite that pushes every
+[Laravel migration column type](https://laravel.com/docs/migrations#available-column-types)
+through the whole pipeline on both supported engines and checks the values
+survive. It is the executable counterpart to the mapping table, and its output
+is where the edge-case notes above come from.
+
+**What it does, per column type, per engine:**
+
+1. Spin up one throwaway database container (MySQL, and SingleStore when
+   configured) — one container per engine, reused across every type.
+2. `CREATE TABLE` with that type, `INSERT` a handful of representative values
+   (including the awkward ones: `BIGINT UNSIGNED` max, zero-dates, empty-but-
+   non-null blobs, 4-byte UTF-8, comma-bearing `ENUM`, `JSON` key ordering, …).
+3. Read the values back off the wire — this is the **baseline**, the exact bytes
+   digestive would export.
+4. Run the real `export` path (source → typemap → Parquet + manifest), then
+   `restore` to a SQL script using that engine's `--dialect`.
+5. `TRUNCATE` the table and replay the restored `INSERT`s.
+6. Read the values back again and make two assertions:
+   - **Fidelity (hard gate):** the reloaded bytes must equal the baseline bytes,
+     cell for cell. Any divergence is a real bug or an edge case to document.
+   - **Golden (characterisation):** whatever came back is recorded in
+     `internal/inttest/golden/<engine>/<type>.golden`, with a header noting the
+     observed source type, chosen Parquet type, and lossless flag. The golden is
+     both a regression lock and the raw material for the mapping table.
+
+The column types live in a human-readable
+[`internal/inttest/fixtures.yaml`](./internal/inttest/fixtures.yaml), keyed by
+Laravel method, so adding a type or a value is a one-line edit.
+
+**Running it:**
+
+```sh
+make test-integration              # MySQL always; SingleStore if configured
+make test-integration UPDATE=1     # regenerate goldens after an intended change
+```
+
+Requirements and behaviour:
+
+- **Docker** must be available. Containers bind to a **random free host port**
+  (never a fixed `:3306`), so a locally-running MySQL doesn't block the tests.
+- The **SingleStore** leg needs a free license key in `SINGLESTORE_LICENSE`
+  (get one at <https://portal.singlestore.com>). Without it that leg **skips**
+  with an explanatory message — it never fails the suite. MySQL is the always-on
+  baseline; SingleStore is best-effort.
+- A **missing golden** is written and passed on first run (with a log line) so a
+  new type characterises itself; review the git diff, then commit it. A **changed
+  golden** fails the run unless you re-run with `UPDATE=1`.
+- Pin engine images with `DIGESTIVE_MYSQL_IMAGE` / `DIGESTIVE_SINGLESTORE_IMAGE`
+  (e.g. MySQL 9 to exercise the native `VECTOR` type).
+
+This suite is **local-only** for now; wiring it into CI is deferred.
+
 ## Scope
 
 v1 implements `export`, `validate`, and `restore` (export run → single SQL

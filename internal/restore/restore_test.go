@@ -135,6 +135,21 @@ func TestRestoreRendersValues(t *testing.T) {
 	}
 }
 
+// TestNegativeZeroDoubleRendersAsFloat guards the fidelity gap surfaced by the
+// dialect round-trip suite: a negative-zero double must render as the float
+// literal "-0e0". The bare "-0" is parsed as an integer and "-0.0" as a DECIMAL
+// — both drop the sign on reload; only "-0e0" round-trips as IEEE negative zero.
+func TestNegativeZeroDoubleRendersAsFloat(t *testing.T) {
+	dir := writeFixture(t, map[string][]col{
+		"t": {{name: "z", dataType: "double", cells: []value.Value{value.Text("-0")}}},
+	})
+	out := runRestore(t, dir, Options{Dialect: MySQL})
+
+	if !strings.Contains(out, "(-0e0)") {
+		t.Errorf("negative zero must render as -0e0 to survive reload\n---\n%s", out)
+	}
+}
+
 func TestSingleStoreDialectOmitsMySQLPreamble(t *testing.T) {
 	dir := writeFixture(t, map[string][]col{
 		"t": {{name: "id", dataType: "int", cells: []value.Value{value.Text("1")}}},

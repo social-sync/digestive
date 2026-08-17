@@ -1,0 +1,7 @@
+# laravel: dateTime
+# engine: mysql
+# source_type: datetime | parquet: BYTE_ARRAY(STRING) | lossless: true
+# note: EDGE: zero datetime.
+---
+"2026-08-17 12:34:56"
+"0000-00-00 00:00:00"

@@ -1,0 +1,8 @@
+# laravel: tinyInteger
+# engine: mysql
+# source_type: tinyint | parquet: INT64 | lossless: false
+---
+"-128"
+"0"
+"127"
+NULL

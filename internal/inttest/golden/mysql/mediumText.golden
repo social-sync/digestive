@@ -1,0 +1,5 @@
+# laravel: mediumText
+# engine: mysql
+# source_type: mediumtext | parquet: BYTE_ARRAY(STRING) | lossless: false
+---
+"medium"

@@ -1,0 +1,8 @@
+# laravel: binary
+# engine: mysql
+# source_type: blob | parquet: BYTE_ARRAY | lossless: true
+# note: EDGE: empty-but-non-null blob must stay distinct from NULL.
+---
+hex:DEADBEEF
+""
+NULL

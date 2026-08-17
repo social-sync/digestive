@@ -1,0 +1,7 @@
+# laravel: mediumInteger
+# engine: mysql
+# source_type: mediumint | parquet: INT64 | lossless: false
+---
+"-8388608"
+"0"
+"8388607"

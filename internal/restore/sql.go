@@ -147,6 +147,14 @@ func renderValue(v parquet.Value, kind renderKind) (string, error) {
 		if math.IsNaN(f) || math.IsInf(f, 0) {
 			return "", fmt.Errorf("cannot render non-finite double %v as SQL", f)
 		}
+		if f == 0 && math.Signbit(f) {
+			// FormatFloat renders negative zero as the bare "-0", and "-0.0" is
+			// parsed as an exact-value DECIMAL (which has no signed zero) — both
+			// reload as positive zero. The float-literal form "-0e0" is the one
+			// spelling MySQL/SingleStore parse as an IEEE double, preserving the
+			// sign across the round-trip.
+			return "-0e0", nil
+		}
 		return strconv.FormatFloat(f, 'g', -1, 64), nil
 	case renderStringLit:
 		return quoteString(v.ByteArray()), nil

@@ -1,0 +1,6 @@
+# laravel: time
+# engine: mysql
+# source_type: time | parquet: BYTE_ARRAY(STRING) | lossless: true
+---
+"12:34:56"
+"00:00:00"

@@ -1,0 +1,7 @@
+# laravel: boolean
+# engine: mysql
+# source_type: tinyint | parquet: INT64 | lossless: false
+# note: Laravel boolean is TINYINT(1); stored as 0/1.
+---
+"0"
+"1"

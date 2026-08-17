@@ -1,0 +1,8 @@
+# laravel: json
+# engine: mysql
+# source_type: json | parquet: BYTE_ARRAY(STRING) | lossless: true
+# note: EDGE: engines normalise JSON (key order, whitespace); the golden records the engine's canonical form so we can tell users what to expect.
+---
+"{\"a\": 2, \"b\": 1}"
+"[1, 2, 3]"
+"null"

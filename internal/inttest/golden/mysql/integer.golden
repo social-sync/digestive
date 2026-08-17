@@ -1,0 +1,7 @@
+# laravel: integer
+# engine: mysql
+# source_type: int | parquet: INT64 | lossless: false
+---
+"-2147483648"
+"0"
+"2147483647"
