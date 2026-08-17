@@ -3,7 +3,7 @@ title: Digestive
 description: A single-binary database exporter that anonymises, redacts, and deterministically hashes data on the way out.
 template: splash
 hero:
-  tagline: Pull production tables into safe, anonymised Parquet you can reload anywhere.
+  tagline: Extract and anonymise your database quickly, then restore it easily. Use it for backups, archiving, staging sites, local development and more.
   actions:
     - text: Get started
       link: /installation/
@@ -14,45 +14,94 @@ hero:
       variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, Steps } from '@astrojs/starlight/components';
 
-## Why Digestive?
+## What is Digestive?
 
-Digestive pulls tables from a SingleStore (MySQL-wire-compatible) database,
-anonymises and redacts the sensitive columns, and writes the result as Parquet
-files plus a manifest — a sanitised, referentially-usable copy of production
-data for your dev, staging, and test environments.
+Digestive is a database-agnostic tool for getting data safely out of your
+database. It extracts your data, anonymises it effectively, stores it in a
+compressed format, and can then output it back to SQL whenever you need it.
 
-<CardGrid stagger>
-	<Card title="Anonymise & redact" icon="approve-check">
-		Built-in transforms null, mask, replace, and deterministically hash PII
-		on the way out — or anonymise the values inside a JSON column while
-		keeping its shape. Nothing sensitive ever touches disk.
+## Quick Start
+
+<div class="quick-example">
+
+<div>
+
+```yaml
+# config.yml — export the users table, anonymised.
+source:
+  dsn: ${DATABASE_DSN}
+
+destination:
+  directory: ./exports
+
+hashing:
+  key: ${EXPORT_HASH_KEY}
+
+tables:
+  - name: users
+    columns:
+      email:
+        transform: hash_email
+      name:
+        transform: mask
+        keep_first: 1
+      password:
+        transform: constant
+        value: "password"
+```
+
+</div>
+
+<div>
+
+<Steps>
+
+1. Install Digestive:
+
+   ```sh
+   brew install social-sync/tap/digestive
+   ```
+
+2. Scaffold a config:
+
+   ```sh
+   digestive init
+   ```
+
+3. Edit `config.yml` and `.env` to add your database details and tables.
+
+4. Run the export:
+
+   ```sh
+   digestive export
+   ```
+
+</Steps>
+
+</div>
+
+</div>
+
+## Main Features
+
+<CardGrid>
+	<Card title="Config-driven" icon="setting">
+		One YAML file with environment-variable substitution for secrets.
+		Opt-in per table, per-column transforms, per-table row filters.
+	</Card>
+	<Card title="Built in anonymisation transformers" icon="approve-check">
+		Six built-in transforms — `null`, `constant`, `mask`, `hash`,
+		`hash_email`, and `json_anonymise` — let you redact, deterministically
+		hash, or anonymise sensitive columns (including values inside JSON) on
+		the way out.
 	</Card>
 	<Card title="Relationships survive" icon="random">
 		Deterministic hashing is global by default: the same value hashes the
 		same everywhere, so foreign-key joins still work in the copy.
 	</Card>
 	<Card title="Single static binary" icon="rocket">
-		Pure-Go, no CGO. Clone, build, and ship one artifact — no runtime
-		dependencies.
-	</Card>
-	<Card title="Config-driven" icon="setting">
-		One YAML file with environment-variable substitution for secrets.
-		Opt-in per table, per-column transforms, per-table row filters.
-	</Card>
-</CardGrid>
-
-## Next steps
-
-<CardGrid>
-	<Card title="Install it" icon="download">
-		[Clone, build, and run `init`](/installation/) to scaffold a config.
-	</Card>
-	<Card title="Configure it" icon="document">
-		[The exhaustive config reference](/configuration/) covers every option.
-	</Card>
-	<Card title="Transform data" icon="pencil">
-		[Browse the transformers](/transformers/) and what each one is for.
+		Simple to install and update.
 	</Card>
 </CardGrid>

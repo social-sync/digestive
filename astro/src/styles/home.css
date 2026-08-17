@@ -1,0 +1,20 @@
+/* Home page layout helpers. */
+
+.quick-example {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 1.5rem;
+	align-items: start;
+}
+
+/* Stack the columns on narrow screens. */
+@media (max-width: 50rem) {
+	.quick-example {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* Let the code block sit flush at the top of its column. */
+.quick-example > :first-child > :first-child {
+	margin-top: 0;
+}
