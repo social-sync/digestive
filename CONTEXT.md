@@ -106,11 +106,35 @@ Two future capabilities the format still anticipates (and which shaped it):
   why the Manifest records full, precise Source type information, and why
   `--dialect` is the seam it would hook into. **Deferred.**
 
+### Restore rules
+Declarative, per-table **schema-shape reconciliation** applied by `restore` to
+bridge drift between the immutable export and a **drifted target** — e.g. your
+local database, whose migrations have renamed, added, or dropped columns since
+the export was taken, so the plain `INSERT`s would fail. The operator *states*
+the drift in a `restore.yaml`; `restore` never connects to the target and so
+cannot detect or verify it — a rule that contradicts the target surfaces as a
+database error at load. Auto-discovered from the working directory (where the
+local app and its migrations live), announced on stderr when applied, and
+skipped with `--ignore-restore-conf`.
+
+Five operations, each rewriting the emitted column list and values: **rename /
+drop / add column** and **rename / drop table**. Adding a column supplies a
+constant value on every row — a quoted literal (the engine coerces it), an
+explicit `null`, or a `raw` SQL expression — for a target column the export
+predates (the load-bearing case: non-null with no default). Rules are validated
+against the Manifest and every contradiction is a hard error (a rule that
+matches nothing is a typo, not a silent no-op). Reconciliation is **schema-shape
+only**: it never transforms a value's meaning — that stays a Transformation on
+the export side. See
+[ADR-0006](./docs/adr/0006-restore-schema-reconciliation.md).
+
 ## v1 scope
 
 In scope: `export` (config → Parquet + Manifest), `validate` (parse config,
 expand env, connect, check tables/columns exist, no export), and `restore`
-(export run → single SQL script of INSERTs, same-engine round-trip). Everything
-else above — realistic fakers, remote Destinations, FK-aware subsetting,
-streaming load piped into a live DB, cross-engine mapping — is deferred but
+(export run → single SQL script of INSERTs, same-engine round-trip), including
+declarative **restore rules** for schema-shape reconciliation against a drifted
+target. Everything else above — realistic fakers, remote Destinations, FK-aware
+subsetting, streaming load piped into a live DB, cross-engine mapping,
+target-schema auto-diffing, and restore-time type-change — is deferred but
 designed for.

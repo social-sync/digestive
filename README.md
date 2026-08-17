@@ -107,12 +107,65 @@ digestive restore ./exports/2026-08-14T15-04-05Z --dialect mysql | mysql -D mydb
 - `--batch-size N` — rows per multi-row `INSERT` (default `1000`).
 - `--allow-incomplete` — restore a run whose `manifest.json` reports
   `complete: false` (refused by default).
+- `--ignore-restore-conf` — ignore a `restore.yaml` in the working directory
+  (see *Reconciling schema drift* below).
 
 The SQL goes to **stdout**; logs and warnings go to stderr. Table names are
 emitted unqualified, so pick the target database with the client
 (`mysql -D dbname`). No DDL is generated — the target is assumed to be a copy of
 the source database whose schema already exists. See
 [ADR-0005](./docs/adr/0005-restore-to-sql.md).
+
+### Reconciling schema drift
+
+An export is an immutable production snapshot, but the target you load it into
+often **drifts** — you pull an export to work on locally and your migrations
+have already renamed a column, dropped one, or added a non-null column with no
+default. The plain `INSERT`s then fail. A **`restore.yaml`** in the working
+directory declares how to reconcile the export with the drifted schema. If the
+file is present, `restore` applies it and notes so on stderr; pass
+`--ignore-restore-conf` to skip it.
+
+It is **declarative** — you *state* the drift; `restore` still connects to
+nothing, so it cannot verify your rules against the live target (a wrong rule
+fails at the database, as it would today). It is **schema-shape only**: it
+reshapes the emitted column set, never a value's meaning (anonymisation stays on
+the export side). Rules live with your local app and its migrations, which is
+why the file is discovered from the working directory rather than the run
+directory.
+
+```yaml
+# restore.yaml
+tables:
+  users:
+    rename_table: app_users        # optional: emit INSERT INTO app_users
+    rename_columns:
+      full_name: display_name      # manifest column -> target column
+    drop_columns:
+      - legacy_flag
+    add_columns:
+      tenant_id:                    # column the export predates
+        value: 1                    # quoted literal; the engine coerces it
+      created_at:
+        value: NOW()
+        raw: true                   # spliced verbatim as a SQL expression
+      deleted_at:
+        value: null                 # explicit SQL NULL
+
+  audit_log:
+    drop_table: true                # skip this table's INSERTs entirely
+```
+
+Five operations: rename / drop / add **column** and rename / drop **table**.
+Every rule is validated against the manifest and any contradiction is a hard
+error — a rule targeting a column or table that isn't in the export, an `add`
+that already exists, a rename that collides with another column, and so on —
+because a rule that silently matches nothing would only fail later at the
+database. Added columns render as a quoted literal (default), an explicit
+`null`, or a `raw` SQL expression, and are emitted in sorted order for
+deterministic output. Restore-time **type changes** and adding a **brand-new
+table** (which has no source data) are out of scope. See
+[ADR-0006](./docs/adr/0006-restore-schema-reconciliation.md).
 
 ## Configuration
 

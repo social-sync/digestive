@@ -14,8 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/social-sync/digestive/internal/manifest"
 	"github.com/parquet-go/parquet-go"
+	"github.com/social-sync/digestive/internal/manifest"
 )
 
 // defaultBatchSize is the number of rows per multi-row INSERT statement.
@@ -34,6 +34,11 @@ type Options struct {
 	// AllowIncomplete permits restoring a run whose manifest reports
 	// complete=false.
 	AllowIncomplete bool
+	// RulesPath is an optional path to a restore.yaml of schema-reconciliation
+	// rules (rename/drop/add columns, rename/drop tables) applied to the
+	// emitted SQL. Empty means no reconciliation: behaviour is identical to
+	// reading only the run directory.
+	RulesPath string
 	// Out receives the SQL script.
 	Out io.Writer
 	// Logger receives progress and warnings; defaults to a no-op logger.
@@ -71,6 +76,21 @@ func Run(opts Options) error {
 		log.Warn("restoring an incomplete export", "run", man.RunID)
 	}
 
+	var rules *Rules
+	if opts.RulesPath != "" {
+		rules, err = LoadRules(opts.RulesPath)
+		if err != nil {
+			return err
+		}
+		if err := rules.validate(man); err != nil {
+			return err
+		}
+		// Announce reconciliation on stderr: auto-discovery means the same
+		// command produces different SQL depending on which directory it runs
+		// in, so the rewrite must never be invisible.
+		log.Info("applying restore rules", "path", opts.RulesPath, "tables", len(rules.Tables))
+	}
+
 	w := bufio.NewWriter(opts.Out)
 
 	writeHeader(w, man, opts.Dialect)
@@ -80,7 +100,12 @@ func Run(opts Options) error {
 	fmt.Fprintln(w)
 
 	for _, table := range man.Tables {
-		if err := restoreTable(w, opts.RunDir, table, batchSize, log); err != nil {
+		tr := rules.forTable(table.Name)
+		if tr.DropTable {
+			log.Info("skipping table per restore rules", "table", table.Name)
+			continue
+		}
+		if err := restoreTable(w, opts.RunDir, table, tr, batchSize, log); err != nil {
 			return fmt.Errorf("restore table %q: %w", table.Name, err)
 		}
 	}
@@ -94,9 +119,19 @@ func writeHeader(w io.Writer, man *manifest.Manifest, d Dialect) {
 	fmt.Fprintf(w, "-- source engine: %s\n\n", man.Source.Engine)
 }
 
-// restoreTable writes one table's comment header and INSERT statements.
-func restoreTable(w *bufio.Writer, runDir string, table manifest.Table, batchSize int, log *slog.Logger) error {
-	fmt.Fprintf(w, "-- table: %s (%d rows)\n", table.Name, table.Rows)
+// restoreTable writes one table's comment header and INSERT statements,
+// applying the table's reconciliation rules (renames, drops, and added
+// constant columns) to the emitted column list and values.
+func restoreTable(w *bufio.Writer, runDir string, table manifest.Table, tr TableRules, batchSize int, log *slog.Logger) error {
+	emitTable := table.Name
+	if tr.RenameTable != "" {
+		emitTable = tr.RenameTable
+	}
+	if emitTable == table.Name {
+		fmt.Fprintf(w, "-- table: %s (%d rows)\n", table.Name, table.Rows)
+	} else {
+		fmt.Fprintf(w, "-- table: %s -> %s (%d rows)\n", table.Name, emitTable, table.Rows)
+	}
 
 	if len(table.Columns) == 0 {
 		return fmt.Errorf("no columns recorded in manifest")
@@ -119,29 +154,51 @@ func restoreTable(w *bufio.Writer, runDir string, table manifest.Table, batchSiz
 	}
 	schema := pf.Schema()
 
-	// Resolve each manifest column to its Parquet leaf index (the schema
-	// orders columns independently of the manifest) and its render kind.
-	colIndex := make([]int, len(table.Columns))
-	kinds := make([]renderKind, len(table.Columns))
-	quotedCols := make([]string, len(table.Columns))
-	for i, c := range table.Columns {
+	dropped := make(map[string]bool, len(tr.DropColumns))
+	for _, c := range tr.DropColumns {
+		dropped[c] = true
+	}
+
+	// Resolve each surviving manifest column to its Parquet leaf index (the
+	// schema orders columns independently of the manifest), its render kind,
+	// and its emitted (possibly renamed) name. Dropped columns are skipped.
+	var colIndex []int
+	var kinds []renderKind
+	var emitCols []string
+	for _, c := range table.Columns {
+		if dropped[c.Name] {
+			continue
+		}
 		leaf, ok := schema.Lookup(c.Name)
 		if !ok {
 			return fmt.Errorf("column %q from manifest is absent from parquet file %s", c.Name, table.File)
 		}
-		colIndex[i] = leaf.ColumnIndex
 		k, err := kindFor(c.ParquetType)
 		if err != nil {
 			return fmt.Errorf("column %q: %w", c.Name, err)
 		}
-		kinds[i] = k
-		quotedCols[i] = quoteIdent(c.Name)
+		emit := c.Name
+		if dst, ok := tr.RenameColumns[c.Name]; ok {
+			emit = dst
+		}
+		colIndex = append(colIndex, leaf.ColumnIndex)
+		kinds = append(kinds, k)
+		emitCols = append(emitCols, quoteIdent(emit))
+	}
+
+	// Added columns carry a constant literal repeated on every row, appended in
+	// sorted order for deterministic output.
+	addNames := sortedKeys(tr.AddColumns)
+	addLits := make([]string, len(addNames))
+	for i, name := range addNames {
+		addLits[i] = tr.AddColumns[name].literal()
+		emitCols = append(emitCols, quoteIdent(name))
 	}
 
 	insertPrefix := fmt.Sprintf("INSERT INTO %s (%s) VALUES\n",
-		quoteIdent(table.Name), strings.Join(quotedCols, ", "))
+		quoteIdent(emitTable), strings.Join(emitCols, ", "))
 
-	written, err := streamRows(w, pf, colIndex, kinds, insertPrefix, batchSize)
+	written, err := streamRows(w, pf, colIndex, kinds, addLits, insertPrefix, batchSize)
 	if err != nil {
 		return err
 	}
@@ -155,8 +212,9 @@ func restoreTable(w *bufio.Writer, runDir string, table manifest.Table, batchSiz
 
 // streamRows reads every row group of pf and writes batched multi-row INSERT
 // statements. It returns the number of rows emitted. A table with no rows
-// produces no INSERT at all.
-func streamRows(w *bufio.Writer, pf *parquet.File, colIndex []int, kinds []renderKind, insertPrefix string, batchSize int) (int64, error) {
+// produces no INSERT at all. addLits are constant literals for added columns,
+// appended verbatim after the parquet-derived values on every row.
+func streamRows(w *bufio.Writer, pf *parquet.File, colIndex []int, kinds []renderKind, addLits []string, insertPrefix string, batchSize int) (int64, error) {
 	numCols := len(colIndex)
 	byCol := make([]parquet.Value, numCols)
 	buf := make([]parquet.Row, 256)
@@ -184,15 +242,24 @@ func streamRows(w *bufio.Writer, pf *parquet.File, colIndex []int, kinds []rende
 					w.WriteString(",\n")
 				}
 				w.WriteByte('(')
+				first := true
 				for k := 0; k < numCols; k++ {
-					if k > 0 {
+					if !first {
 						w.WriteString(", ")
 					}
+					first = false
 					lit, err := renderValue(byCol[colIndex[k]], kinds[k])
 					if err != nil {
 						rows.Close()
 						return total, err
 					}
+					w.WriteString(lit)
+				}
+				for _, lit := range addLits {
+					if !first {
+						w.WriteString(", ")
+					}
+					first = false
 					w.WriteString(lit)
 				}
 				w.WriteByte(')')
