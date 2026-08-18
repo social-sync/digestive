@@ -39,15 +39,22 @@ func ParseDialect(s string) (Dialect, error) {
 	}
 }
 
-// preamble returns the session statements emitted before any INSERTs, in
-// order. START TRANSACTION is included; the matching COMMIT is emitted last.
-func (d Dialect) preamble() []string {
+// sessionStatements returns the session-setup statements emitted before any
+// INSERTs, in order, excluding transaction control. These configure the
+// connection (charset, and for MySQL the constraint-check toggles) and are safe
+// to run inside a caller-managed transaction, which is how `sync` applies them.
+func (d Dialect) sessionStatements() []string {
 	stmts := []string{"SET NAMES utf8mb4;"}
 	if d == MySQL {
 		stmts = append(stmts, "SET FOREIGN_KEY_CHECKS=0;", "SET UNIQUE_CHECKS=0;")
 	}
-	stmts = append(stmts, "START TRANSACTION;")
 	return stmts
+}
+
+// preamble returns the session statements emitted before any INSERTs, in
+// order. START TRANSACTION is included; the matching COMMIT is emitted last.
+func (d Dialect) preamble() []string {
+	return append(d.sessionStatements(), "START TRANSACTION;")
 }
 
 // quoteIdent backtick-quotes a table or column identifier, doubling any

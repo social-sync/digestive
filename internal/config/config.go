@@ -14,6 +14,7 @@ import (
 type Config struct {
 	Source      SourceConfig      `yaml:"source"`
 	Destination DestinationConfig `yaml:"destination"`
+	Sync        SyncConfig        `yaml:"sync"`
 	Hashing     HashingConfig     `yaml:"hashing"`
 	Tables      []TableConfig     `yaml:"tables"`
 }
@@ -29,6 +30,18 @@ type SourceConfig struct {
 // directory only.
 type DestinationConfig struct {
 	Directory string `yaml:"directory"`
+}
+
+// SyncConfig describes the destination database `digestive sync` applies an
+// export into. It is read only by the sync command; export, validate, and
+// restore ignore it entirely.
+type SyncConfig struct {
+	// DSN is the destination database, in go-sql-driver/mysql format. Supply it
+	// via ${VAR} substitution so credentials never live in the file.
+	DSN string `yaml:"dsn"`
+	// Type selects the destination engine, which fixes both the SQL driver and
+	// the restore dialect. Currently "mysql" or "singlestore" (both MySQL-wire).
+	Type string `yaml:"type"`
 }
 
 // HashingConfig holds the secret used to key deterministic hashing.

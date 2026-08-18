@@ -12,6 +12,13 @@ destination:
   # Local directory. Each run writes into a timestamped sub-directory.
   directory: ./exports
 
+# Optional. Only used by `digestive sync`, which runs an export and applies its
+# INSERTs straight into a live database (existing schema required — sync does
+# not create tables). Uncomment and set a DSN to use it.
+# sync:
+#   dsn: ${SYNC_DSN}   # go-sql-driver/mysql DSN for the destination
+#   type: mysql        # mysql or singlestore
+
 hashing:
   # HMAC secret for deterministic hashing. Keep it out of the file and stable
   # across runs, or pseudonyms (and joins) will change.

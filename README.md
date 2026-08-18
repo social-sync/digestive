@@ -167,6 +167,49 @@ deterministic output. Restore-time **type changes** and adding a **brand-new
 table** (which has no source data) are out of scope. See
 [ADR-0006](./docs/adr/0006-restore-schema-reconciliation.md).
 
+## Sync
+
+`sync` runs the whole pipeline end to end — export, then apply the same
+`INSERT`s `restore` would emit **directly into a destination database** over the
+Go SQL driver. No `mysql` client, no intermediate piping. The destination lives
+in config under a `sync` block:
+
+```yaml
+sync:
+  dsn: ${SYNC_DSN}   # go-sql-driver/mysql DSN for the destination
+  type: mysql        # mysql or singlestore — selects driver + restore dialect
+```
+
+```sh
+digestive sync                                  # export fresh, then apply
+digestive sync ./exports/2026-08-14T15-04-05Z   # skip export, apply an existing run
+```
+
+The apply runs in a **single transaction**: it either lands completely or rolls
+back, leaving the destination untouched. Because it reuses `restore`, a
+`restore.yaml` in the working directory is honoured identically, and the data
+applied is byte-for-byte what a piped `restore` would load. The destination
+**schema must already exist** — like `restore`, `sync` inserts data and does not
+create tables; a missing table surfaces as a database error and rolls the sync
+back.
+
+`sync` flags:
+
+- `--yes` — skip the confirmation prompt. `sync` is the one command that writes
+  to a live database, so when stderr is a terminal it prints the destination
+  host and database and asks before applying; the prompt is skipped
+  automatically when non-interactive (CI, piped) or with `--yes`.
+- `--cleanup` — delete the run directory after a successful apply (ignored when
+  you pass an existing run directory; a failed apply always keeps it).
+- `--dialect singlestore|mysql` — override the dialect derived from `sync.type`.
+- `--batch-size N`, `--allow-incomplete`, `--ignore-restore-conf` — as for
+  `restore`.
+- `--no-tui` — as for `export`.
+
+DDL generation, an external-client pipe for engines without a Go driver, and
+Postgres support are out of scope for now; the `type` key is the seam they would
+build on. See [ADR-0007](./docs/adr/0007-sync-direct-apply.md).
+
 ## Configuration
 
 See the template at [internal/templates/config.yaml](./internal/templates/config.yaml)
@@ -287,13 +330,15 @@ This suite is **local-only** for now; wiring it into CI is deferred.
 
 ## Scope
 
-v1 implements `export`, `validate`, and `restore` (export run → single SQL
-script of INSERTs, same-engine round-trip). Streaming load piped directly into a
-destination DB, cross-engine type remapping (e.g. to Postgres), a **realistic
-faker** family (plausible fake names/addresses), remote destinations, and
-FK-aware subsetting are **deferred but designed for** — see the ADRs. Structural
-JSON anonymisation (`json_anonymise`) is implemented; faker-backed *realistic*
-leaf values are the deferred part.
+v1 implements `export`, `validate`, `restore` (export run → single SQL script of
+INSERTs, same-engine round-trip), and `sync` (export → apply straight into a
+destination database over the driver, in one transaction). Cross-engine type
+remapping (e.g. to Postgres), an external-client pipe for engines without a Go
+driver, DDL/schema creation at the destination, a **realistic faker** family
+(plausible fake names/addresses), remote destinations, and FK-aware subsetting
+are **deferred but designed for** — see the ADRs. Structural JSON anonymisation
+(`json_anonymise`) is implemented; faker-backed *realistic* leaf values are the
+deferred part.
 
 ## License
 

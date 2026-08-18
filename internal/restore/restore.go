@@ -45,15 +45,33 @@ type Options struct {
 	Logger *slog.Logger
 }
 
-// Run reads the export run in opts.RunDir and streams a single SQL script to
-// opts.Out.
-func Run(opts Options) error {
+// Prepared is a validated restore, ready to emit table by table. It loads and
+// validates the manifest and any reconciliation rules once, then serves both
+// the SQL-script output (Run) and live application against a database (the
+// sync command, via internal/target). It holds no open files or connections.
+type Prepared struct {
+	// Manifest is the loaded export manifest.
+	Manifest *manifest.Manifest
+	// Dialect is the resolved target SQL engine.
+	Dialect Dialect
+
+	runDir    string
+	rules     *Rules
+	batchSize int
+	log       *slog.Logger
+}
+
+// Prepare loads and validates the export run in opts.RunDir (and any
+// reconciliation rules) without emitting anything. It performs every check Run
+// does up front — manifest version, completeness, and rule validation — so a
+// caller that applies the restore fails before touching a database.
+func Prepare(opts Options) (*Prepared, error) {
 	log := opts.Logger
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
 	if opts.Dialect == "" {
-		return fmt.Errorf("dialect is required")
+		return nil, fmt.Errorf("dialect is required")
 	}
 	batchSize := opts.BatchSize
 	if batchSize <= 0 {
@@ -62,14 +80,14 @@ func Run(opts Options) error {
 
 	man, err := manifest.Load(filepath.Join(opts.RunDir, "manifest.json"))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if man.Version > manifest.Version {
-		return fmt.Errorf("manifest version %d is newer than this binary understands (%d); upgrade digestive",
+		return nil, fmt.Errorf("manifest version %d is newer than this binary understands (%d); upgrade digestive",
 			man.Version, manifest.Version)
 	}
 	if !man.Complete && !opts.AllowIncomplete {
-		return fmt.Errorf("manifest reports an incomplete export (complete=false); " +
+		return nil, fmt.Errorf("manifest reports an incomplete export (complete=false); " +
 			"it may be missing rows or whole tables — pass --allow-incomplete to restore it anyway")
 	}
 	if !man.Complete {
@@ -80,10 +98,10 @@ func Run(opts Options) error {
 	if opts.RulesPath != "" {
 		rules, err = LoadRules(opts.RulesPath)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if err := rules.validate(man); err != nil {
-			return err
+			return nil, err
 		}
 		// Announce reconciliation on stderr: auto-discovery means the same
 		// command produces different SQL depending on which directory it runs
@@ -91,21 +109,58 @@ func Run(opts Options) error {
 		log.Info("applying restore rules", "path", opts.RulesPath, "tables", len(rules.Tables))
 	}
 
+	return &Prepared{
+		Manifest:  man,
+		Dialect:   opts.Dialect,
+		runDir:    opts.RunDir,
+		rules:     rules,
+		batchSize: batchSize,
+		log:       log,
+	}, nil
+}
+
+// SessionStatements returns the session-setup statements to run before any
+// table, excluding transaction control (the caller manages the transaction).
+func (p *Prepared) SessionStatements() []string {
+	return p.Dialect.sessionStatements()
+}
+
+// Tables returns the manifest tables in emit order. Tables dropped by a
+// restore rule are still included; check TableRules(name).DropTable to skip
+// them, exactly as Run does.
+func (p *Prepared) Tables() []manifest.Table {
+	return p.Manifest.Tables
+}
+
+// TableRules returns the reconciliation rules for a table, or a zero-value
+// (no-op) TableRules when none are declared.
+func (p *Prepared) TableRules(name string) TableRules {
+	return p.rules.forTable(name)
+}
+
+// Run reads the export run in opts.RunDir and streams a single SQL script to
+// opts.Out.
+func Run(opts Options) error {
+	p, err := Prepare(opts)
+	if err != nil {
+		return err
+	}
+
 	w := bufio.NewWriter(opts.Out)
 
-	writeHeader(w, man, opts.Dialect)
-	for _, stmt := range opts.Dialect.preamble() {
+	writeHeader(w, p.Manifest, p.Dialect)
+	for _, stmt := range p.Dialect.preamble() {
 		fmt.Fprintln(w, stmt)
 	}
 	fmt.Fprintln(w)
 
-	for _, table := range man.Tables {
-		tr := rules.forTable(table.Name)
+	for _, table := range p.Tables() {
+		tr := p.TableRules(table.Name)
 		if tr.DropTable {
-			log.Info("skipping table per restore rules", "table", table.Name)
+			p.log.Info("skipping table per restore rules", "table", table.Name)
 			continue
 		}
-		if err := restoreTable(w, opts.RunDir, table, tr, batchSize, log); err != nil {
+		if _, err := p.writeTable(w, table, tr); err != nil {
 			return fmt.Errorf("restore table %q: %w", table.Name, err)
 		}
 	}
@@ -114,15 +169,29 @@ func Run(opts Options) error {
 	return w.Flush()
 }
 
+// WriteTable writes one table's comment header and INSERT statements to w and
+// returns the number of rows emitted. It is the per-table seam sync uses to
+// execute a table's INSERTs in isolation; a zero return means the table
+// produced no INSERT (an empty table), so the caller can skip executing it.
+// Dropped tables (TableRules.DropTable) must be filtered by the caller.
+func (p *Prepared) WriteTable(w io.Writer, table manifest.Table, tr TableRules) (int64, error) {
+	bw := bufio.NewWriter(w)
+	rows, err := p.writeTable(bw, table, tr)
+	if err != nil {
+		return rows, err
+	}
+	return rows, bw.Flush()
+}
+
 func writeHeader(w io.Writer, man *manifest.Manifest, d Dialect) {
 	fmt.Fprintf(w, "-- digestive restore — run %s, exported %s, dialect %s\n", man.RunID, man.CreatedAt, d)
 	fmt.Fprintf(w, "-- source engine: %s\n\n", man.Source.Engine)
 }
 
-// restoreTable writes one table's comment header and INSERT statements,
-// applying the table's reconciliation rules (renames, drops, and added
-// constant columns) to the emitted column list and values.
-func restoreTable(w *bufio.Writer, runDir string, table manifest.Table, tr TableRules, batchSize int, log *slog.Logger) error {
+// writeTable writes one table's comment header and INSERT statements, applying
+// the table's reconciliation rules (renames, drops, and added constant columns)
+// to the emitted column list and values. It returns the number of rows emitted.
+func (p *Prepared) writeTable(w *bufio.Writer, table manifest.Table, tr TableRules) (int64, error) {
 	emitTable := table.Name
 	if tr.RenameTable != "" {
 		emitTable = tr.RenameTable
@@ -134,23 +203,23 @@ func restoreTable(w *bufio.Writer, runDir string, table manifest.Table, tr Table
 	}
 
 	if len(table.Columns) == 0 {
-		return fmt.Errorf("no columns recorded in manifest")
+		return 0, fmt.Errorf("no columns recorded in manifest")
 	}
 
-	path := filepath.Join(runDir, table.File)
+	path := filepath.Join(p.runDir, table.File)
 	f, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("open parquet file %s: %w", table.File, err)
+		return 0, fmt.Errorf("open parquet file %s: %w", table.File, err)
 	}
 	defer f.Close()
 
 	info, err := f.Stat()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	pf, err := parquet.OpenFile(f, info.Size())
 	if err != nil {
-		return fmt.Errorf("read parquet %s: %w", table.File, err)
+		return 0, fmt.Errorf("read parquet %s: %w", table.File, err)
 	}
 	schema := pf.Schema()
 
@@ -171,11 +240,11 @@ func restoreTable(w *bufio.Writer, runDir string, table manifest.Table, tr Table
 		}
 		leaf, ok := schema.Lookup(c.Name)
 		if !ok {
-			return fmt.Errorf("column %q from manifest is absent from parquet file %s", c.Name, table.File)
+			return 0, fmt.Errorf("column %q from manifest is absent from parquet file %s", c.Name, table.File)
 		}
 		k, err := kindFor(c.ParquetType)
 		if err != nil {
-			return fmt.Errorf("column %q: %w", c.Name, err)
+			return 0, fmt.Errorf("column %q: %w", c.Name, err)
 		}
 		emit := c.Name
 		if dst, ok := tr.RenameColumns[c.Name]; ok {
@@ -198,16 +267,16 @@ func restoreTable(w *bufio.Writer, runDir string, table manifest.Table, tr Table
 	insertPrefix := fmt.Sprintf("INSERT INTO %s (%s) VALUES\n",
 		quoteIdent(emitTable), strings.Join(emitCols, ", "))
 
-	written, err := streamRows(w, pf, colIndex, kinds, addLits, insertPrefix, batchSize)
+	written, err := streamRows(w, pf, colIndex, kinds, addLits, insertPrefix, p.batchSize)
 	if err != nil {
-		return err
+		return written, err
 	}
 	if written != table.Rows {
-		log.Warn("row count differs between parquet file and manifest",
+		p.log.Warn("row count differs between parquet file and manifest",
 			"table", table.Name, "parquet_rows", written, "manifest_rows", table.Rows)
 	}
 	fmt.Fprintln(w)
-	return nil
+	return written, nil
 }
 
 // streamRows reads every row group of pf and writes batched multi-row INSERT
