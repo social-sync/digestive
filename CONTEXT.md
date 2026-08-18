@@ -98,8 +98,9 @@ the session preamble. See
 [ADR-0005](./docs/adr/0005-restore-to-sql.md).
 
 Two future capabilities the format still anticipates (and which shaped it):
-- **Streaming load** — stream each Parquet file, convert to INSERTs on the fly,
-  and pipe directly into a destination DB (no intermediate `.sql` file needed).
+- **Streaming load** — apply the INSERTs directly into a destination DB instead
+  of emitting a `.sql` file. Realized by **Sync** (below), which executes them
+  over the Go SQL driver.
 - **Cross-engine type mapping** — a separate mapping config that translates
   Source types into another engine's types (Postgres is the primary target),
   so a SingleStore export can be restored into a different DB engine. This is
@@ -128,13 +129,34 @@ only**: it never transforms a value's meaning — that stays a Transformation on
 the export side. See
 [ADR-0006](./docs/adr/0006-restore-schema-reconciliation.md).
 
+### Sync
+Running the whole pipeline end to end: an export immediately followed by a
+Restore applied **directly into a destination database**, exposed as the `sync`
+command. Rather than emit a `.sql` file, `sync` opens the destination itself
+(over the same Go SQL driver the Source uses) and executes the Restore's
+statements inside a **single transaction** — all-or-nothing, so the destination
+is either fully synced or untouched. It reuses Restore verbatim (same SQL, same
+**restore rules**), so the data applied is byte-for-byte what a piped `restore`
+would load.
+
+The destination is declared in config under a `sync` block: a **DSN** and a
+**type** (`mysql` or `singlestore`). Type selects both the driver and the
+Restore dialect, and is the seam a future engine (e.g. Postgres) slots into.
+`sync` with no argument exports fresh then applies; given an existing export run
+directory it skips the export and applies that run (a retry path). Like Restore,
+it emits `INSERT`s only and **creates no tables** — the destination schema is a
+precondition. It is the one command that writes to a live database, so it prompts
+for confirmation when attached to a terminal (skipped when non-interactive or
+with `--yes`). See [ADR-0007](./docs/adr/0007-sync-direct-apply.md).
+
 ## v1 scope
 
 In scope: `export` (config → Parquet + Manifest), `validate` (parse config,
-expand env, connect, check tables/columns exist, no export), and `restore`
+expand env, connect, check tables/columns exist, no export), `restore`
 (export run → single SQL script of INSERTs, same-engine round-trip), including
 declarative **restore rules** for schema-shape reconciliation against a drifted
-target. Everything else above — realistic fakers, remote Destinations, FK-aware
-subsetting, streaming load piped into a live DB, cross-engine mapping,
-target-schema auto-diffing, and restore-time type-change — is deferred but
-designed for.
+target, and `sync` (export → apply directly into a destination DB over the
+driver, in one transaction). Everything else above — realistic fakers, remote
+Destinations, FK-aware subsetting, an external-client pipe for driver-less
+engines, cross-engine mapping, destination DDL/schema creation, target-schema
+auto-diffing, and restore-time type-change — is deferred but designed for.

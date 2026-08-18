@@ -97,3 +97,66 @@ tables:
 		t.Errorf("column transform not parsed: %+v", orders.Columns)
 	}
 }
+
+func TestLoadSyncBlock(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	yaml := `
+source:
+  dsn: ${TEST_DSN}
+destination:
+  directory: ./out
+sync:
+  dsn: ${TEST_SYNC_DSN}
+  type: mysql
+hashing:
+  key: ${TEST_KEY}
+tables:
+  - users
+`
+	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TEST_DSN", "u:p@tcp(h)/d")
+	t.Setenv("TEST_SYNC_DSN", "u:p@tcp(dest)/copy")
+	t.Setenv("TEST_KEY", "secret")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Sync.DSN != "u:p@tcp(dest)/copy" {
+		t.Errorf("sync.dsn not expanded: %q", cfg.Sync.DSN)
+	}
+	if cfg.Sync.Type != "mysql" {
+		t.Errorf("sync.type = %q, want mysql", cfg.Sync.Type)
+	}
+}
+
+func TestLoadWithoutSyncBlockLeavesItZero(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	yaml := `
+source:
+  dsn: ${TEST_DSN}
+destination:
+  directory: ./out
+hashing:
+  key: ${TEST_KEY}
+tables:
+  - users
+`
+	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TEST_DSN", "u:p@tcp(h)/d")
+	t.Setenv("TEST_KEY", "secret")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Sync != (SyncConfig{}) {
+		t.Errorf("sync block should be zero when absent, got %+v", cfg.Sync)
+	}
+}

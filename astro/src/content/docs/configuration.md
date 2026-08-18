@@ -15,6 +15,11 @@ source:
 destination:
   directory: ./exports
 
+# Optional — only used by `digestive sync`.
+sync:
+  dsn: ${SYNC_DSN}
+  type: mysql
+
 hashing:
   key: ${EXPORT_HASH_KEY}
 
@@ -101,6 +106,27 @@ parent directories. Each run writes into a sub-directory of this path — see
 
 Remote destinations (object storage, etc.) are not supported yet; v1 writes to
 a local directory only.
+
+## `sync`
+
+The destination database [`digestive sync`](/sync/) applies an export into. It
+is **optional** — read only by `sync`; `export`, `validate`, and `restore`
+ignore it entirely.
+
+```yaml
+sync:
+  dsn: ${SYNC_DSN}
+  type: mysql
+```
+
+| Key | Type | Required | Description |
+| --- | --- | --- | --- |
+| `dsn` | string | for `sync` | A [go-sql-driver/mysql DSN](https://github.com/go-sql-driver/mysql#dsn-data-source-name) for the destination. Supply via `${VAR}`. |
+| `type` | string | for `sync` | The destination engine: `mysql` or `singlestore`. Selects both the driver and the [restore dialect](/restore/#the---dialect-flag-is-required). |
+
+`sync` applies data into an **existing schema** — it never creates tables — and
+loads it in a single all-or-nothing transaction. See [Sync](/sync/) for the full
+behaviour, the confirmation guard, and the flags.
 
 ## `hashing`
 
@@ -254,6 +280,8 @@ Each run creates a sub-directory under `destination.directory`:
 digestive init                 # scaffold config.yaml + .env
 digestive validate             # check config against the live schema, no export
 digestive export               # run the export
+digestive restore <run-dir>    # export run -> SQL script of INSERTs
+digestive sync                 # export, then apply straight into a database
 ```
 
 ### Global flags
@@ -269,6 +297,20 @@ digestive export               # run the export
 | --- | --- | --- |
 | `--run-name` | timestamp | Name of the run sub-directory. |
 | `--delete-on-failure` | `false` | Remove the run directory entirely if the export fails, so repeated failures don't accumulate partial output. |
+
+### `sync` flags
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--yes` | `false` | Skip the confirmation prompt (auto-skipped when non-interactive). |
+| `--cleanup` | `false` | Delete the run directory after a successful apply. Ignored when a run directory is given. |
+| `--dialect` | from `type` | Override the restore dialect: `singlestore` or `mysql`. |
+| `--batch-size` | `1000` | Rows per multi-row `INSERT`. |
+| `--allow-incomplete` | `false` | Apply even if the manifest reports an incomplete export. |
+| `--ignore-restore-conf` | `false` | Ignore a `restore.yaml` in the working directory. |
+| `--no-tui` | `false` | Disable the live progress UI and log plainly instead. |
+
+See [Sync](/sync/) for the full command reference.
 
 ### Failure behaviour
 
