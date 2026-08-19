@@ -128,6 +128,46 @@ sync:
 loads it in a single all-or-nothing transaction. See [Sync](/sync/) for the full
 behaviour, the confirmation guard, and the flags.
 
+## `compliance`
+
+Turns on **audit logging**. When this block is present, `export` and `sync` write
+a per-run audit record and **require** `--requester-name` / `--requester-email`.
+It is **optional** — absent, the tool behaves exactly as before. See
+[Compliance](/compliance/) for the full behaviour and the record schema.
+
+```yaml
+compliance:
+  audit:
+    # Set exactly one of `directory` or `s3`.
+    directory: ./audit-logs
+    # s3:
+    #   endpoint: ${AUDIT_S3_ENDPOINT}     # host[:port], no scheme
+    #   bucket: ${AUDIT_S3_BUCKET}
+    #   prefix: exports/
+    #   region: ${AUDIT_S3_REGION:-us-east-1}
+    #   access_key_id: ${AUDIT_S3_ACCESS_KEY}
+    #   secret_access_key: ${AUDIT_S3_SECRET_KEY}
+    #   use_ssl: true
+    #   path_style: true
+```
+
+| Key | Type | Required | Description |
+| --- | --- | --- | --- |
+| `audit.directory` | string | one of `directory`/`s3` | Local directory to write audit JSON files into. |
+| `audit.s3` | map | one of `directory`/`s3` | An S3-compatible destination (see below). |
+| `audit.s3.endpoint` | string | for `s3` | Host `host[:port]`, no scheme (TLS via `use_ssl`). |
+| `audit.s3.bucket` | string | for `s3` | Target bucket. Must already exist. |
+| `audit.s3.prefix` | string | no | Optional key prefix for written objects. |
+| `audit.s3.region` | string | no | Signing region. Default `us-east-1`; use `auto` for R2. |
+| `audit.s3.access_key_id` | string | for `s3` | Access key. Supply via `${VAR}`. |
+| `audit.s3.secret_access_key` | string | for `s3` | Secret key. Supply via `${VAR}`. |
+| `audit.s3.use_ssl` | bool | no | Use HTTPS to reach the endpoint. |
+| `audit.s3.path_style` | bool | no | Force path-style addressing (MinIO/Ceph/custom domains). |
+
+A present-but-invalid block (neither or both of `directory`/`s3`, or an `s3`
+block missing a required field) is a **hard error at load time** — auditing is
+never silently disabled.
+
 ## `hashing`
 
 The secret that keys deterministic hashing.
@@ -297,6 +337,9 @@ digestive sync                 # export, then apply straight into a database
 | --- | --- | --- |
 | `--run-name` | timestamp | Name of the run sub-directory. |
 | `--delete-on-failure` | `false` | Remove the run directory entirely if the export fails, so repeated failures don't accumulate partial output. |
+| `--requester-name` | — | Name of the requester. Required when [`compliance`](#compliance) is configured. |
+| `--requester-email` | — | Email of the requester. Required when `compliance` is configured; must be a valid address. |
+| `--cleanup-on-audit-fail` | `false` | Delete the run directory if the [audit record](/compliance/) can't be written. |
 
 ### `sync` flags
 
@@ -309,6 +352,9 @@ digestive sync                 # export, then apply straight into a database
 | `--allow-incomplete` | `false` | Apply even if the manifest reports an incomplete export. |
 | `--ignore-restore-conf` | `false` | Ignore a `restore.yaml` in the working directory. |
 | `--no-tui` | `false` | Disable the live progress UI and log plainly instead. |
+| `--requester-name` | — | Name of the requester. Required when [`compliance`](#compliance) is configured. |
+| `--requester-email` | — | Email of the requester. Required when `compliance` is configured; must be a valid address. |
+| `--cleanup-on-audit-fail` | `false` | Delete the run directory if the [audit record](/compliance/) can't be written. |
 
 See [Sync](/sync/) for the full command reference.
 

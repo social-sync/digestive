@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
@@ -17,13 +18,18 @@ type Config struct {
 	Sync        SyncConfig        `yaml:"sync"`
 	Hashing     HashingConfig     `yaml:"hashing"`
 	Tables      []TableConfig     `yaml:"tables"`
+	// Compliance, when present, turns on audit logging: export and sync then
+	// require a named requester and write a per-run audit record. Its absence
+	// (nil) leaves the tool behaving exactly as before.
+	Compliance *ComplianceConfig `yaml:"compliance"`
 }
 
 // SourceConfig describes the database to read from.
 type SourceConfig struct {
 	// DSN is a go-sql-driver/mysql data source name. SingleStore is MySQL
-	// wire compatible, so the same DSN format applies.
-	DSN string `yaml:"dsn"`
+	// wire compatible, so the same DSN format applies. Sensitive: redacted in
+	// audit records.
+	DSN string `yaml:"dsn" redact:"true"`
 }
 
 // DestinationConfig describes where output is written. v1 supports a local
@@ -37,8 +43,9 @@ type DestinationConfig struct {
 // restore ignore it entirely.
 type SyncConfig struct {
 	// DSN is the destination database, in go-sql-driver/mysql format. Supply it
-	// via ${VAR} substitution so credentials never live in the file.
-	DSN string `yaml:"dsn"`
+	// via ${VAR} substitution so credentials never live in the file. Sensitive:
+	// redacted in audit records.
+	DSN string `yaml:"dsn" redact:"true"`
 	// Type selects the destination engine, which fixes both the SQL driver and
 	// the restore dialect. Currently "mysql" or "singlestore" (both MySQL-wire).
 	Type string `yaml:"type"`
@@ -47,8 +54,79 @@ type SyncConfig struct {
 // HashingConfig holds the secret used to key deterministic hashing.
 type HashingConfig struct {
 	// Key is the HMAC secret. It should be supplied via ${VAR} substitution,
-	// never written in plaintext.
-	Key string `yaml:"key"`
+	// never written in plaintext. Sensitive: redacted in audit records.
+	Key string `yaml:"key" redact:"true"`
+}
+
+// ComplianceConfig turns on audit logging. Its mere presence makes export and
+// sync require a requester; a present-but-invalid block is a hard error, never
+// a silent no-op.
+type ComplianceConfig struct {
+	Audit AuditConfig `yaml:"audit"`
+}
+
+// AuditConfig describes where audit records are written. Exactly one of
+// Directory or S3 must be set.
+type AuditConfig struct {
+	// Directory writes audit JSON files to a local directory.
+	Directory string `yaml:"directory"`
+	// S3 writes audit JSON objects to an S3-compatible bucket.
+	S3 *S3Config `yaml:"s3"`
+}
+
+// S3Config describes an S3-compatible destination for audit records.
+type S3Config struct {
+	// Endpoint is the host[:port] of the S3-compatible service, with no scheme
+	// (the scheme is controlled by UseSSL).
+	Endpoint string `yaml:"endpoint"`
+	// Bucket is the target bucket. It must already exist.
+	Bucket string `yaml:"bucket"`
+	// Prefix is an optional key prefix (e.g. "exports/") for written objects.
+	Prefix string `yaml:"prefix"`
+	// Region is the signing region; default "us-east-1". Use "auto" for R2.
+	Region string `yaml:"region"`
+	// AccessKeyID and SecretAccessKey are the service credentials. Supply them
+	// via ${VAR} substitution. Sensitive: redacted in audit records.
+	AccessKeyID     string `yaml:"access_key_id" redact:"true"`
+	SecretAccessKey string `yaml:"secret_access_key" redact:"true"`
+	// UseSSL selects https (maps to minio Options.Secure).
+	UseSSL bool `yaml:"use_ssl"`
+	// PathStyle forces path-style bucket addressing (MinIO/Ceph/custom domains).
+	PathStyle bool `yaml:"path_style"`
+}
+
+// Validate checks that a present compliance block is well-formed. It is called
+// at load time so a malformed block fails loudly rather than silently disabling
+// the audit gate.
+func (c *ComplianceConfig) Validate() error {
+	hasDir := c.Audit.Directory != ""
+	hasS3 := c.Audit.S3 != nil
+	switch {
+	case !hasDir && !hasS3:
+		return fmt.Errorf("compliance.audit requires exactly one of `directory` or `s3`; neither is set")
+	case hasDir && hasS3:
+		return fmt.Errorf("compliance.audit sets both `directory` and `s3`; set exactly one")
+	}
+	if hasS3 {
+		s3 := c.Audit.S3
+		var missing []string
+		if s3.Endpoint == "" {
+			missing = append(missing, "endpoint")
+		}
+		if s3.Bucket == "" {
+			missing = append(missing, "bucket")
+		}
+		if s3.AccessKeyID == "" {
+			missing = append(missing, "access_key_id")
+		}
+		if s3.SecretAccessKey == "" {
+			missing = append(missing, "secret_access_key")
+		}
+		if len(missing) > 0 {
+			return fmt.Errorf("compliance.audit.s3 is missing required field(s): %s", strings.Join(missing, ", "))
+		}
+	}
+	return nil
 }
 
 // TableConfig selects a table for export and, optionally, how to reduce and
@@ -136,6 +214,13 @@ func Load(path string) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal([]byte(expanded), &cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
+	}
+	// A present compliance block is validated eagerly: "on but broken" must be a
+	// hard error, never a silent no-op that skips the audit gate.
+	if cfg.Compliance != nil {
+		if err := cfg.Compliance.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	return &cfg, nil
 }

@@ -19,6 +19,22 @@ destination:
 #   dsn: ${SYNC_DSN}   # go-sql-driver/mysql DSN for the destination
 #   type: mysql        # mysql or singlestore
 
+# Optional. Turns on audit logging: when present, `export` and `sync` write a
+# per-run audit record and REQUIRE --requester-name / --requester-email. Set
+# exactly one of `directory` (local) or `s3` (S3-compatible storage).
+# compliance:
+#   audit:
+#     directory: ./audit-logs
+#     # s3:
+#     #   endpoint: ${AUDIT_S3_ENDPOINT}     # host[:port], no scheme
+#     #   bucket: ${AUDIT_S3_BUCKET}
+#     #   prefix: exports/
+#     #   region: ${AUDIT_S3_REGION:-us-east-1}
+#     #   access_key_id: ${AUDIT_S3_ACCESS_KEY}
+#     #   secret_access_key: ${AUDIT_S3_SECRET_KEY}
+#     #   use_ssl: true
+#     #   path_style: true
+
 hashing:
   # HMAC secret for deterministic hashing. Keep it out of the file and stable
   # across runs, or pseudonyms (and joins) will change.
