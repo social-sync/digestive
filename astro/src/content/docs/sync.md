@@ -112,9 +112,17 @@ implies.
 | `--allow-incomplete` | `false` | Apply even if the manifest reports an incomplete export. |
 | `--ignore-restore-conf` | `false` | Ignore a `restore.yaml` in the working directory. |
 | `--no-tui` | `false` | Disable the live progress UI and log plainly instead. |
+| `--requester-name` | — | Name of the requester. Required when [compliance](/compliance/) is configured. |
+| `--requester-email` | — | Email of the requester. Required when compliance is configured; must be a valid address. |
+| `--cleanup-on-audit-fail` | `false` | Delete the run directory if the [audit record](/compliance/) can't be written. |
 
 Plus the [global flags](/configuration/#global-flags) `--config` and
 `--log-level`.
+
+When a [`compliance:`](/compliance/) block is configured, `sync` requires a
+requester and writes an audit record **after the export but before applying** to
+the destination — so data never lands without a trail. See
+[Compliance](/compliance/).
 
 ## What's out of scope
 

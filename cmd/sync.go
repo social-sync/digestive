@@ -53,6 +53,13 @@ func runSync(ctx context.Context, args []string) error {
 		return err
 	}
 
+	// Validate the requester up front when compliance is on, so a missing flag
+	// fails before any target connection or export work.
+	requester, err := requireRequester(cfg)
+	if err != nil {
+		return err
+	}
+
 	// Resolve and open the destination first, so a missing/invalid sync block or
 	// an unreachable target fails before any export work happens.
 	tgt, err := target.Open(cfg.Sync.Type, cfg.Sync.DSN)
@@ -105,6 +112,18 @@ func runSync(ctx context.Context, args []string) error {
 			return err
 		}
 		created = true
+	}
+
+	// Write the audit record after the export artifact exists but before any data
+	// is applied downstream, so a "data loaded" state can never coexist with a
+	// missing audit trail. Reusing an existing run directory still logs a "sync".
+	if cfg.Compliance != nil {
+		if err := writeAudit(ctx, cfg, "sync", runDir, requester); err != nil {
+			if created && cleanupOnAuditFail {
+				os.RemoveAll(runDir)
+			}
+			return err
+		}
 	}
 
 	// Prepare the restore, discovering restore.yaml exactly as `restore` does.
@@ -184,5 +203,6 @@ func init() {
 	syncCmd.Flags().BoolVar(&syncAllowIncomplete, "allow-incomplete", false, "apply even if the manifest reports an incomplete export")
 	syncCmd.Flags().BoolVar(&syncIgnoreConf, "ignore-restore-conf", false, "ignore a restore.yaml in the working directory")
 	syncCmd.Flags().BoolVar(&noTUI, "no-tui", false, "disable the live progress UI and log plainly instead")
+	addComplianceFlags(syncCmd)
 	syncCmd.SetContext(context.Background())
 }

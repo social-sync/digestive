@@ -64,6 +64,11 @@ already exists it fails and writes nothing. Edit `.env` to set your
   so repeated failures don't accumulate partial output.
 - `--no-tui` — disable the live progress UI and emit plain structured log lines
   instead.
+- `--requester-name` / `--requester-email` — the person requesting the export.
+  **Required** when [compliance audit logging](#compliance-audit-logging) is
+  configured; ignored otherwise.
+- `--cleanup-on-audit-fail` — delete the run directory if the audit record can't
+  be written (enforces "no export without an audit trail").
 
 When stderr is an interactive terminal, `export` renders a live progress
 display (one line per table, with row counts and timings) that stays in
@@ -209,6 +214,50 @@ back.
 DDL generation, an external-client pipe for engines without a Go driver, and
 Postgres support are out of scope for now; the `type` key is the seam they would
 build on. See [ADR-0007](./docs/adr/0007-sync-direct-apply.md).
+
+## Compliance audit logging
+
+For regulated data you can record **who** pulled an export, **when**, under
+**what config**, and **how many rows** left each table. Add a `compliance:` block
+to your config and every `export` and `sync` writes a per-run **audit record** (a
+JSON document) to an S3-compatible bucket **or** a local directory:
+
+```yaml
+compliance:
+  audit:
+    # exactly one of `directory` or `s3`
+    directory: ./audit-logs
+    # s3:
+    #   endpoint: ${AUDIT_S3_ENDPOINT}     # host[:port], no scheme
+    #   bucket: ${AUDIT_S3_BUCKET}
+    #   prefix: exports/
+    #   region: ${AUDIT_S3_REGION:-us-east-1}
+    #   access_key_id: ${AUDIT_S3_ACCESS_KEY}
+    #   secret_access_key: ${AUDIT_S3_SECRET_KEY}
+    #   use_ssl: true
+    #   path_style: true
+```
+
+The feature is **opt-in and gated by config** — off unless `compliance:` is
+present, and **mandatory** when it is:
+
+- `export` and `sync` then **require** `--requester-name` and
+  `--requester-email` (validated before any work; the email must parse).
+- A present-but-malformed block is a **hard error at load time** — auditing is
+  never silently disabled.
+
+Each record captures the requester, timestamps, the run's output location, the
+**resolved config with secrets redacted** (`source.dsn`, `sync.dsn`,
+`hashing.key`, and S3 credentials become `***REDACTED***`), the full
+`manifest.json`, and a per-table row-count map. It's written **only on success**;
+if the write fails the command **exits non-zero**, and `--cleanup-on-audit-fail`
+additionally deletes the run directory so a completed export is never left without
+its trail. For `sync`, the record is written **before** applying to the target,
+so data never lands without an audit. The S3 sink uses
+[`minio-go`](https://github.com/minio/minio-go) and works with MinIO, Cloudflare
+R2, Ceph, Wasabi, and AWS S3.
+
+See [ADR-0008](./docs/adr/0008-compliance-audit-logging.md) for the design.
 
 ## Configuration
 
