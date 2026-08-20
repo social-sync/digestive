@@ -25,6 +25,7 @@ export default defineConfig({
 				{ label: 'Transformers', slug: 'transformers' },
 				{ label: 'Restore', slug: 'restore' },
 				{ label: 'Sync', slug: 'sync' },
+				{ label: 'JSON output', slug: 'json-output' },
 				{ label: 'Compliance', slug: 'compliance' },
 			],
 		}),

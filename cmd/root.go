@@ -2,6 +2,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -39,6 +40,11 @@ var rootCmd = &cobra.Command{
 // Execute runs the root command.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		// The outcome was already emitted as a JSON envelope on stdout; exit
+		// non-zero without a stderr line so the --json contract holds.
+		if errors.Is(err, errJSONReported) {
+			os.Exit(1)
+		}
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
@@ -47,10 +53,21 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", "config.yaml", "path to the YAML config file")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "log level (debug, info, warn, error)")
+	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "emit a single JSON result on stdout and disable the TUI (quiet unless --log-level is raised)")
+	// Record whether --log-level was set explicitly, so --json can stay quiet
+	// by default while still honouring an explicit level.
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, _ []string) {
+		logLevelChanged = cmd.Flags().Changed("log-level")
+	}
 	rootCmd.AddCommand(exportCmd, validateCmd, restoreCmd, syncCmd)
 }
 
 func newLogger() *slog.Logger {
+	// Under --json, stderr stays quiet unless the caller raised --log-level
+	// explicitly; stdout is reserved for the JSON envelope.
+	if jsonOutput && !logLevelChanged {
+		return slog.New(slog.DiscardHandler)
+	}
 	var level slog.Level
 	switch strings.ToLower(logLevel) {
 	case "debug":

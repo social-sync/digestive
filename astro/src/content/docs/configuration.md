@@ -330,6 +330,7 @@ digestive sync                 # export, then apply straight into a database
 | --- | --- | --- |
 | `--config`, `-c` | `config.yaml` | Path to the config file. |
 | `--log-level` | `info` | Log verbosity: `debug`, `info`, `warn`, `error`. |
+| `--json` | `false` | Emit a single JSON result on stdout and disable the TUI. See [JSON output](/json-output/). |
 
 ### `export` flags
 
@@ -337,6 +338,8 @@ digestive sync                 # export, then apply straight into a database
 | --- | --- | --- |
 | `--run-name` | timestamp | Name of the run sub-directory. |
 | `--delete-on-failure` | `false` | Remove the run directory entirely if the export fails, so repeated failures don't accumulate partial output. |
+| `--no-tui` | `false` | Disable the live progress UI and log plainly instead. |
+| `--json` | `false` | Emit a JSON result on stdout instead of the TUI ([JSON output](/json-output/)). |
 | `--requester-name` | — | Name of the requester. Required when [`compliance`](#compliance) is configured. |
 | `--requester-email` | — | Email of the requester. Required when `compliance` is configured; must be a valid address. |
 | `--cleanup-on-audit-fail` | `false` | Delete the run directory if the [audit record](/compliance/) can't be written. |
@@ -352,6 +355,7 @@ digestive sync                 # export, then apply straight into a database
 | `--allow-incomplete` | `false` | Apply even if the manifest reports an incomplete export. |
 | `--ignore-restore-conf` | `false` | Ignore a `restore.yaml` in the working directory. |
 | `--no-tui` | `false` | Disable the live progress UI and log plainly instead. |
+| `--json` | `false` | Emit a JSON result on stdout instead of the TUI ([JSON output](/json-output/)). Requires `--yes`. |
 | `--requester-name` | — | Name of the requester. Required when [`compliance`](#compliance) is configured. |
 | `--requester-email` | — | Email of the requester. Required when `compliance` is configured; must be a valid address. |
 | `--cleanup-on-audit-fail` | `false` | Delete the run directory if the [audit record](/compliance/) can't be written. |

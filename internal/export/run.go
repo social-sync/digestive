@@ -32,14 +32,22 @@ type Options struct {
 	Progress Reporter
 }
 
-// Validate resolves and checks the whole config against the live source
-// schema without exporting any data.
-func Validate(ctx context.Context, src source.Source, cfg *config.Config) error {
+// Validate resolves and checks the whole config against the live source schema
+// without exporting any data. It returns the names of the tables that validated,
+// in config order, so a caller can report what was checked.
+func Validate(ctx context.Context, src source.Source, cfg *config.Config) ([]string, error) {
 	if err := src.Ping(ctx); err != nil {
-		return fmt.Errorf("connect to source: %w", err)
+		return nil, fmt.Errorf("connect to source: %w", err)
 	}
-	_, err := buildPlan(ctx, src, cfg)
-	return err
+	plans, err := buildPlan(ctx, src, cfg)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, len(plans))
+	for i, plan := range plans {
+		names[i] = plan.cfg.Name
+	}
+	return names, nil
 }
 
 // Run executes a full export and returns the run directory it produced. The

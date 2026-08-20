@@ -138,6 +138,36 @@ func (p *Prepared) TableRules(name string) TableRules {
 	return p.rules.forTable(name)
 }
 
+// TableStat summarises one table's emitted output without generating any SQL.
+// Statements is the number of multi-row INSERTs the table would produce; it is
+// zero for an empty table and for a dropped one.
+type TableStat struct {
+	Name       string `json:"name"`
+	Rows       int64  `json:"rows"`
+	Statements int    `json:"statements"`
+	Dropped    bool   `json:"dropped,omitempty"`
+}
+
+// Summary reports, per table, how many rows and INSERT statements a restore
+// would emit — without reading the Parquet files or generating any SQL. Row
+// counts come from the manifest; statement counts derive from the batch size.
+// Tables dropped by a restore rule are marked Dropped and contribute nothing.
+func (p *Prepared) Summary() []TableStat {
+	stats := make([]TableStat, 0, len(p.Manifest.Tables))
+	for _, t := range p.Manifest.Tables {
+		if p.TableRules(t.Name).DropTable {
+			stats = append(stats, TableStat{Name: t.Name, Rows: t.Rows, Dropped: true})
+			continue
+		}
+		statements := 0
+		if t.Rows > 0 {
+			statements = int((t.Rows + int64(p.batchSize) - 1) / int64(p.batchSize))
+		}
+		stats = append(stats, TableStat{Name: t.Name, Rows: t.Rows, Statements: statements})
+	}
+	return stats
+}
+
 // Run reads the export run in opts.RunDir and streams a single SQL script to
 // opts.Out.
 func Run(opts Options) error {

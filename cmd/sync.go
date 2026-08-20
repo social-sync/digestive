@@ -41,30 +41,61 @@ var syncCmd = &cobra.Command{
 		"in the working directory is honoured exactly as `restore` honours it.",
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runSync(cmd.Context(), args)
+		res, warnings, err := runSync(cmd.Context(), args)
+		return finish("sync", res, warnings, err, func() {
+			// The (kept) run directory is echoed for inspection or re-apply;
+			// a cleaned-up run has none to print.
+			if res.RunDir != nil {
+				fmt.Println(*res.RunDir)
+			}
+		})
 	},
 }
 
-func runSync(ctx context.Context, args []string) error {
+// syncResult is the --json payload for a successful sync.
+type syncResult struct {
+	RunDir      *string     `json:"run_dir"` // null when --cleanup removed it
+	RunID       string      `json:"run_id"`
+	Tables      []tableStat `json:"tables"`
+	TotalRows   int64       `json:"total_rows"`
+	Applied     bool        `json:"applied"`
+	Destination syncDest    `json:"destination"`
+}
+
+// syncDest identifies the database a sync applied into.
+type syncDest struct {
+	Type     string `json:"type"`
+	Host     string `json:"host"`
+	Database string `json:"database"`
+}
+
+func runSync(ctx context.Context, args []string) (*syncResult, []string, error) {
+	// A machine consumer cannot answer the confirmation prompt, so --json must
+	// carry an explicit --yes: it forces the caller to acknowledge the live-DB
+	// write rather than have it silently implied.
+	if jsonOutput && !syncYes {
+		return nil, nil, fmt.Errorf("--yes is required with --json")
+	}
+
 	log := newLogger()
 
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	// Validate the requester up front when compliance is on, so a missing flag
 	// fails before any target connection or export work.
 	requester, err := requireRequester(cfg)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	// Resolve and open the destination first, so a missing/invalid sync block or
 	// an unreachable target fails before any export work happens.
 	tgt, err := target.Open(cfg.Sync.Type, cfg.Sync.DSN)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	defer tgt.Close()
 
@@ -72,12 +103,12 @@ func runSync(ctx context.Context, args []string) error {
 	if syncDialect != "" {
 		dialect, err = restore.ParseDialect(syncDialect)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 	}
 
 	if err := tgt.Ping(ctx); err != nil {
-		return fmt.Errorf("connect to destination: %w", err)
+		return nil, nil, fmt.Errorf("connect to destination: %w", err)
 	}
 
 	// Confirmation guard: this is the one command that writes to a live database,
@@ -86,30 +117,31 @@ func runSync(ctx context.Context, args []string) error {
 	if !syncYes && stderrIsTerminal() {
 		ok, err := confirmSync(os.Stdin, cfg.Sync.Type, tgt.Host(), tgt.Database())
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 		if !ok {
-			return fmt.Errorf("aborted")
+			return nil, nil, fmt.Errorf("aborted")
 		}
 	}
 
 	// Obtain a run directory: use the one given, or export a fresh one.
 	runDir := ""
 	created := false
+	var warnings []string
 	if len(args) == 1 {
 		runDir = args[0]
 	} else {
 		if cfg.Source.DSN == "" {
-			return fmt.Errorf("source.dsn is required to export (or pass an existing run directory)")
+			return nil, nil, fmt.Errorf("source.dsn is required to export (or pass an existing run directory)")
 		}
 		src, err := source.OpenSingleStore(cfg.Source.DSN)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
-		runDir, err = runExport(ctx, src, cfg)
+		runDir, warnings, err = runExport(ctx, src, cfg)
 		src.Close()
 		if err != nil {
-			return err
+			return nil, warnings, err
 		}
 		created = true
 	}
@@ -122,8 +154,15 @@ func runSync(ctx context.Context, args []string) error {
 			if created && cleanupOnAuditFail {
 				os.RemoveAll(runDir)
 			}
-			return err
+			return nil, warnings, err
 		}
+	}
+
+	// Build the result payload from the manifest before any cleanup, so the
+	// table/row summary survives even when --cleanup removes the directory.
+	res, err := exportResultFromManifest(runDir)
+	if err != nil {
+		return nil, warnings, err
 	}
 
 	// Prepare the restore, discovering restore.yaml exactly as `restore` does.
@@ -142,14 +181,24 @@ func runSync(ctx context.Context, args []string) error {
 		Logger:          log,
 	})
 	if err != nil {
-		return err
+		return nil, warnings, err
 	}
 
 	log.Info("applying to destination", "host", tgt.Host(), "database", tgt.Database(), "type", cfg.Sync.Type)
 	if err := tgt.Apply(ctx, prepared, &applyLogger{log: log}); err != nil {
-		return err
+		return nil, warnings, err
 	}
 	log.Info("sync complete", "host", tgt.Host(), "database", tgt.Database())
+
+	dir := runDir
+	result := &syncResult{
+		RunDir:      &dir,
+		RunID:       res.RunID,
+		Tables:      res.Tables,
+		TotalRows:   res.TotalRows,
+		Applied:     true,
+		Destination: syncDest{Type: cfg.Sync.Type, Host: tgt.Host(), Database: tgt.Database()},
+	}
 
 	// Clean up the run directory only when we created it this run and were asked
 	// to; a run directory passed in is never ours to delete, and a failed apply
@@ -159,13 +208,11 @@ func runSync(ctx context.Context, args []string) error {
 			log.Warn("cleanup failed", "dir", runDir, "err", err)
 		} else {
 			log.Info("run directory removed", "dir", runDir)
-			return nil
+			result.RunDir = nil
 		}
 	}
 
-	// Echo the (kept) run directory on stdout so it can be inspected or re-applied.
-	fmt.Println(runDir)
-	return nil
+	return result, warnings, nil
 }
 
 // confirmSync prompts on stderr for confirmation before writing to a live
