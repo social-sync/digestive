@@ -69,6 +69,8 @@ already exists it fails and writes nothing. Edit `.env` to set your
   configured; ignored otherwise.
 - `--cleanup-on-audit-fail` — delete the run directory if the audit record can't
   be written (enforces "no export without an audit trail").
+- `--json` — emit a JSON result on stdout instead of the TUI (see
+  [JSON output](#json-output)).
 
 When stderr is an interactive terminal, `export` renders a live progress
 display (one line per table, with row counts and timings) that stays in
@@ -88,6 +90,65 @@ Each run writes:
 Parquet files are compressed with **zstd**. The compression is stored inside
 each file, so any standard reader (DuckDB, pandas, Spark, …) opens it directly —
 there is no separate decompression step.
+
+## JSON output
+
+Every command accepts a persistent `--json` flag for machine consumers (a web
+app shelling out to the binary, CI, scripts). Under `--json`:
+
+- **stdout carries exactly one JSON object** — pretty-printed, trailing
+  newline, and nothing else. The live TUI is disabled.
+- It applies to **success and failure alike**: a failing run still prints a JSON
+  object (with `status: "error"`), and the process still exits non-zero, so
+  `&&` chains and CI keep working. A consumer never has to scrape stderr.
+- It implies **quiet**: diagnostic logging on stderr is suppressed unless you
+  raise it explicitly with `--log-level` (stdout stays pure JSON regardless).
+
+Every command emits the same envelope; the per-command payload lives in
+`result`:
+
+```json
+{
+  "schema_version": 1,
+  "command": "export",
+  "status": "ok",
+  "error": null,
+  "warnings": [],
+  "result": {
+    "run_dir": "exports/2026-08-14T15-04-05Z",
+    "run_id": "2026-08-14T15-04-05Z",
+    "tables": [
+      { "name": "users", "rows": 48210 },
+      { "name": "orders", "rows": 195003 }
+    ],
+    "total_rows": 243213
+  }
+}
+```
+
+`schema_version` lets a consumer guard against future shape changes; `status` is
+`"ok"` or `"error"` and mirrors the exit code; `error` is `null` on success or a
+string on failure; `warnings` is always an array. `result` per command:
+
+- **export** — `run_dir`, `run_id`, per-table `{name, rows}`, and `total_rows`
+  (drawn from the manifest the run just wrote).
+- **sync** — the same table/row summary plus `applied`, `destination`
+  (`{type, host, database}`), and `run_dir` (`null` when `--cleanup` removed
+  it). Under `--json`, `sync` **requires `--yes`** — since a machine consumer
+  can't answer the confirmation prompt, the flag must be passed explicitly to
+  acknowledge the live-database write, otherwise `sync` returns a JSON error.
+- **restore** — a **summary**, not SQL: `run_dir`, `dialect`, per-table
+  `{name, rows, statements}`, and `total_statements`. `restore --json` emits no
+  SQL on stdout; use plain `restore` (capturing stdout) when you want the script
+  itself, or `sync` to apply directly.
+- **validate** — `tables` and `table_count`.
+- **init** — `created` (the files written). The generated hashing key is
+  **never** included in the output; it lives only in `.env`.
+
+The JSON contract covers execution-time outcomes. A malformed *invocation* that
+`cobra` rejects before the command runs (an unknown flag or command, a missing
+required argument) still errors conventionally on stderr — a consumer should
+treat "stdout did not parse as JSON" as a failed invocation.
 
 ## Restore
 
@@ -114,6 +175,8 @@ digestive restore ./exports/2026-08-14T15-04-05Z --dialect mysql | mysql -D mydb
   `complete: false` (refused by default).
 - `--ignore-restore-conf` — ignore a `restore.yaml` in the working directory
   (see *Reconciling schema drift* below).
+- `--json` — emit a JSON **summary** (dialect, per-table row/statement counts)
+  on stdout instead of the SQL script (see [JSON output](#json-output)).
 
 The SQL goes to **stdout**; logs and warnings go to stderr. Table names are
 emitted unqualified, so pick the target database with the client
@@ -210,6 +273,9 @@ back.
 - `--batch-size N`, `--allow-incomplete`, `--ignore-restore-conf` — as for
   `restore`.
 - `--no-tui` — as for `export`.
+- `--json` — emit a JSON result on stdout instead of the TUI (see
+  [JSON output](#json-output)); **requires `--yes`** since a machine consumer
+  cannot answer the confirmation prompt.
 
 DDL generation, an external-client pipe for engines without a Go driver, and
 Postgres support are out of scope for now; the `type` key is the seam they would

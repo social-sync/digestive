@@ -207,7 +207,7 @@ func TestValidateCatchesTextOnlyTransform(t *testing.T) {
 			}},
 		},
 	}
-	if err := Validate(context.Background(), src, cfg); err == nil {
+	if _, err := Validate(context.Background(), src, cfg); err == nil {
 		t.Fatal("expected validation error for hashing a non-text column")
 	}
 }
@@ -227,7 +227,7 @@ func TestValidateCatchesJSONOnlyTransform(t *testing.T) {
 			}},
 		},
 	}
-	if err := Validate(context.Background(), src, cfg); err == nil {
+	if _, err := Validate(context.Background(), src, cfg); err == nil {
 		t.Fatal("expected validation error for json_anonymise on a non-json column")
 	}
 }
@@ -372,7 +372,7 @@ func TestExcludeWithTransformErrors(t *testing.T) {
 			}},
 		},
 	}
-	if err := Validate(context.Background(), src, cfg); err == nil {
+	if _, err := Validate(context.Background(), src, cfg); err == nil {
 		t.Fatal("expected error combining exclude with a transform")
 	}
 }

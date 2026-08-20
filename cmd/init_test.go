@@ -9,7 +9,7 @@ import (
 func TestRunInitCreatesFiles(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	if err := runInit(); err != nil {
+	if _, err := runInit(); err != nil {
 		t.Fatalf("runInit: %v", err)
 	}
 
@@ -40,7 +40,7 @@ func TestRunInitCreatesFiles(t *testing.T) {
 
 	// Two runs must produce different keys (crypto/rand, not a fixed seed).
 	t.Chdir(t.TempDir())
-	if err := runInit(); err != nil {
+	if _, err := runInit(); err != nil {
 		t.Fatal(err)
 	}
 	env2, _ := os.ReadFile(initEnvFile)
@@ -56,7 +56,7 @@ func TestRunInitRefusesToOverwrite(t *testing.T) {
 	if err := os.WriteFile(initConfigFile, []byte("existing"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	err := runInit()
+	_, err := runInit()
 	if err == nil {
 		t.Fatal("expected init to fail when a target file exists")
 	}

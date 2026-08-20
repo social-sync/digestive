@@ -15,6 +15,16 @@ var (
 	restoreIgnoreConf      bool
 )
 
+// restoreResult is the --json payload for restore. Under --json restore reports
+// what it would emit rather than the SQL itself: the raw SQL script is produced
+// only on the plain (non-JSON) path.
+type restoreResult struct {
+	RunDir          string              `json:"run_dir"`
+	Dialect         string              `json:"dialect"`
+	Tables          []restore.TableStat `json:"tables"`
+	TotalStatements int                 `json:"total_statements"`
+}
+
 var restoreCmd = &cobra.Command{
 	Use:   "restore <run-dir>",
 	Short: "Turn an export run into a SQL script of INSERTs",
@@ -27,11 +37,16 @@ var restoreCmd = &cobra.Command{
 		"If a restore.yaml exists in the working directory, its schema-reconciliation " +
 		"rules (rename/drop/add columns, rename/drop tables) are applied to the emitted " +
 		"SQL, and a line noting this is written to stderr. Pass --ignore-restore-conf to " +
-		"skip it.",
+		"skip it.\n\n" +
+		"With --json, restore emits no SQL: stdout carries a JSON summary of the run " +
+		"(dialect and per-table row/statement counts) instead.",
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dialect, err := restore.ParseDialect(restoreDialect)
 		if err != nil {
+			if jsonOutput {
+				return reportJSON("restore", nil, nil, err)
+			}
 			return err
 		}
 
@@ -44,6 +59,11 @@ var restoreCmd = &cobra.Command{
 			}
 		}
 
+		if jsonOutput {
+			res, err := restoreSummary(args[0], dialect, rulesPath)
+			return reportJSON("restore", res, nil, err)
+		}
+
 		return restore.Run(restore.Options{
 			RunDir:          args[0],
 			Dialect:         dialect,
@@ -54,6 +74,32 @@ var restoreCmd = &cobra.Command{
 			Logger:          newLogger(),
 		})
 	},
+}
+
+// restoreSummary prepares the restore and returns a JSON summary of what it
+// would emit, without generating any SQL.
+func restoreSummary(runDir string, dialect restore.Dialect, rulesPath string) (*restoreResult, error) {
+	p, err := restore.Prepare(restore.Options{
+		RunDir:          runDir,
+		Dialect:         dialect,
+		BatchSize:       restoreBatchSize,
+		AllowIncomplete: restoreAllowIncomplete,
+		RulesPath:       rulesPath,
+		Logger:          newLogger(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	stats := p.Summary()
+	res := &restoreResult{
+		RunDir:  runDir,
+		Dialect: string(dialect),
+		Tables:  stats,
+	}
+	for _, s := range stats {
+		res.TotalStatements += s.Statements
+	}
+	return res, nil
 }
 
 func init() {

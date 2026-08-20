@@ -82,6 +82,10 @@ COMMIT;
 - **Unqualified table names.** Pick the target database with the client, e.g.
   `mysql -D dbname`.
 
+For a machine-readable run, `restore --json` emits a **summary** (dialect and
+per-table row/statement counts) instead of the SQL — see
+[JSON output](/json-output/).
+
 ## How values become SQL literals
 
 Each value is rendered by the physical type the manifest recorded for its

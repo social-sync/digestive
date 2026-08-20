@@ -112,6 +112,7 @@ implies.
 | `--allow-incomplete` | `false` | Apply even if the manifest reports an incomplete export. |
 | `--ignore-restore-conf` | `false` | Ignore a `restore.yaml` in the working directory. |
 | `--no-tui` | `false` | Disable the live progress UI and log plainly instead. |
+| `--json` | `false` | Emit a JSON result on stdout instead of the TUI ([JSON output](/json-output/)). Requires `--yes`. |
 | `--requester-name` | — | Name of the requester. Required when [compliance](/compliance/) is configured. |
 | `--requester-email` | — | Email of the requester. Required when compliance is configured; must be a valid address. |
 | `--cleanup-on-audit-fail` | `false` | Delete the run directory if the [audit record](/compliance/) can't be written. |

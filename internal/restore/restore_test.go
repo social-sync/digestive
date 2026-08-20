@@ -231,3 +231,31 @@ func TestParseDialect(t *testing.T) {
 		t.Error("ParseDialect(postgres) should error")
 	}
 }
+
+func TestSummaryStatementCounts(t *testing.T) {
+	// 3 rows in "users", 0 rows in "empty".
+	dir := writeFixture(t, map[string][]col{
+		"users": {
+			{name: "id", dataType: "int", cells: []value.Value{value.Text("1"), value.Text("2"), value.Text("3")}},
+		},
+		"empty": {
+			{name: "id", dataType: "int", cells: []value.Value{}},
+		},
+	})
+
+	// batchSize 2 over 3 rows -> 2 statements; empty table -> 0.
+	p, err := Prepare(Options{RunDir: dir, Dialect: MySQL, BatchSize: 2})
+	if err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	byName := map[string]TableStat{}
+	for _, s := range p.Summary() {
+		byName[s.Name] = s
+	}
+	if got := byName["users"]; got.Rows != 3 || got.Statements != 2 || got.Dropped {
+		t.Errorf("users summary = %+v, want rows=3 statements=2 dropped=false", got)
+	}
+	if got := byName["empty"]; got.Rows != 0 || got.Statements != 0 {
+		t.Errorf("empty summary = %+v, want rows=0 statements=0", got)
+	}
+}
