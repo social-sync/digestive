@@ -1,5 +1,31 @@
 /* Home page layout helpers. */
 
+/* "Built by Social Sync" banner. */
+.ss-banner {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.ss-banner a {
+	display: inline-flex;
+	align-items: center;
+}
+
+.ss-banner__logo {
+	width: 6.5rem;
+	height: auto;
+	fill: currentColor;
+	vertical-align: middle;
+}
+
+@media (min-width: 50rem) {
+	.ss-banner__logo {
+		width: 8rem;
+	}
+}
+
+
 .quick-example {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
