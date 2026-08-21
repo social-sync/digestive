@@ -2,6 +2,7 @@ package restore
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -188,6 +189,38 @@ func TestEmptyTableEmitsCommentOnly(t *testing.T) {
 	}
 	if strings.Contains(out, "INSERT INTO `empties`") {
 		t.Errorf("empty table must not emit an INSERT\n%s", out)
+	}
+}
+
+// TestDropColumnLeavesLeafIndexGap guards against a crash when a dropped column
+// leaves a gap in the Parquet leaf indices: surviving columns keep their
+// original leaf indices, so the highest one exceeds the surviving-column count.
+// Dropping the first column is the minimal reproduction — the last survivor then
+// has leaf index == number-of-survivors, which used to index past byCol.
+func TestDropColumnLeavesLeafIndexGap(t *testing.T) {
+	dir := writeFixture(t, map[string][]col{
+		"users": {
+			{name: "id", dataType: "int", cells: []value.Value{value.Text("1"), value.Text("2")}},
+			{name: "name", dataType: "varchar", cells: []value.Value{value.Text("a"), value.Text("b")}},
+			{name: "email", dataType: "varchar", cells: []value.Value{value.Text("x"), value.Text("y")}},
+		},
+	})
+
+	rulesPath := filepath.Join(dir, "restore.yaml")
+	if err := os.WriteFile(rulesPath, []byte("tables:\n  users:\n    drop_columns: [id]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out := runRestore(t, dir, Options{Dialect: SingleStore, RulesPath: rulesPath})
+
+	if !strings.Contains(out, "INSERT INTO `users` (`name`, `email`) VALUES") {
+		t.Errorf("expected INSERT without dropped id column\n%s", out)
+	}
+	if !strings.Contains(out, "('a', 'x')") || !strings.Contains(out, "('b', 'y')") {
+		t.Errorf("expected surviving column values, got:\n%s", out)
+	}
+	if strings.Contains(out, "`id`") {
+		t.Errorf("dropped column must not appear\n%s", out)
 	}
 }
 
