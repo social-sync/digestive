@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install Digestive via Homebrew, the install script, or from source, and scaffold a config.
+description: Install Digestive via Homebrew, the install script, or from source.
 ---
 
 Digestive ships as a single self-contained binary. Install a prebuilt release
@@ -30,7 +30,7 @@ choose the target directory, or `DIGESTIVE_VERSION=v1.2.3` to pin a version.
 [releases page](https://github.com/social-sync/digestive/releases), extract it,
 and put the `digestive` binary on your `PATH`.
 
-Once installed, skip ahead to [Scaffold a config](#scaffold-a-config).
+Once installed, skip ahead to [Getting started](/getting-started/).
 
 ## Build from source
 
@@ -65,65 +65,4 @@ Verify it works:
 
 ```sh
 ./digestive --help
-```
-
-## Scaffold a config
-
-From the directory you want to work in, run `init`. It writes two files:
-
-```sh
-./digestive init
-```
-
-- **`config.yaml`** — a starter configuration you edit to describe your export.
-- **`.env`** — holds your secrets, created with a freshly generated random
-  hashing key (`EXPORT_HASH_KEY`) and a placeholder database DSN. It is written
-  with `0600` permissions because it contains secrets.
-
-:::caution[init never overwrites]
-If either `config.yaml` or `.env` already exists, `init` fails and writes
-nothing — so re-running it can't clobber your config or regenerate (and thereby
-invalidate) your hashing key. Delete the files yourself if you truly want to
-start over.
-:::
-
-## Point it at your database
-
-Edit `.env` and set your connection string. The DSN uses the
-[go-sql-driver/mysql](https://github.com/go-sql-driver/mysql#dsn-data-source-name)
-format; SingleStore is MySQL wire compatible, so the same format applies:
-
-```ini
-# .env
-SINGLESTORE_DSN=root:password@tcp(127.0.0.1:3306)/mydb
-EXPORT_HASH_KEY=<generated for you by init — keep it stable>
-```
-
-:::note[Keep the key stable]
-`EXPORT_HASH_KEY` is the secret that keys deterministic hashing. If it changes
-between runs, every hashed value changes too, and previously-exported data will
-no longer join. Keep it constant (and out of source control).
-:::
-
-## Validate, then export
-
-Describe the tables you want in `config.yaml` (see
-[Configuration](/configuration/)), then:
-
-```sh
-# Check the config against the live schema without exporting anything.
-./digestive validate
-
-# Run the export.
-./digestive export
-```
-
-A successful export prints the run directory it produced, e.g.
-`./exports/2026-08-14T15-04-05Z/`, containing one Parquet file per table plus a
-`manifest.json`.
-
-To turn that run back into loadable SQL, see [Restore](/restore/):
-
-```sh
-./digestive restore ./exports/2026-08-14T15-04-05Z --dialect singlestore > dump.sql
 ```
