@@ -297,7 +297,7 @@ func (p *Prepared) writeTable(w *bufio.Writer, table manifest.Table, tr TableRul
 	insertPrefix := fmt.Sprintf("INSERT INTO %s (%s) VALUES\n",
 		quoteIdent(emitTable), strings.Join(emitCols, ", "))
 
-	written, err := streamRows(w, pf, colIndex, kinds, addLits, insertPrefix, p.batchSize)
+	written, err := streamRows(w, pf, len(schema.Columns()), colIndex, kinds, addLits, insertPrefix, p.batchSize)
 	if err != nil {
 		return written, err
 	}
@@ -313,9 +313,12 @@ func (p *Prepared) writeTable(w *bufio.Writer, table manifest.Table, tr TableRul
 // statements. It returns the number of rows emitted. A table with no rows
 // produces no INSERT at all. addLits are constant literals for added columns,
 // appended verbatim after the parquet-derived values on every row.
-func streamRows(w *bufio.Writer, pf *parquet.File, colIndex []int, kinds []renderKind, addLits []string, insertPrefix string, batchSize int) (int64, error) {
+func streamRows(w *bufio.Writer, pf *parquet.File, parquetCols int, colIndex []int, kinds []renderKind, addLits []string, insertPrefix string, batchSize int) (int64, error) {
 	numCols := len(colIndex)
-	byCol := make([]parquet.Value, numCols)
+	// byCol is indexed by parquet leaf column index, which is independent of the
+	// number of selected columns: dropped columns leave gaps, so colIndex entries
+	// (and v.Column() values) can exceed numCols. Size it to the full schema width.
+	byCol := make([]parquet.Value, parquetCols)
 	buf := make([]parquet.Row, 256)
 
 	var total int64
@@ -330,7 +333,7 @@ func streamRows(w *bufio.Writer, pf *parquet.File, colIndex []int, kinds []rende
 					byCol[j] = parquet.Value{}
 				}
 				for _, v := range buf[i] {
-					if ci := v.Column(); ci >= 0 && ci < numCols {
+					if ci := v.Column(); ci >= 0 && ci < parquetCols {
 						byCol[ci] = v
 					}
 				}
