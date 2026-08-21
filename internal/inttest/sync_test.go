@@ -5,6 +5,7 @@ package inttest
 import (
 	"context"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/social-sync/digestive/internal/manifest"
@@ -136,6 +137,46 @@ func TestMySQLSyncApply(t *testing.T) {
 		}
 		if got := countRows(ctx, t, eng, "sync_users"); got != 2 {
 			t.Errorf("sync_users row count = %d, want 2", got)
+		}
+	})
+
+	t.Run("splits a large table into packet-sized chunks", func(t *testing.T) {
+		mustExec(t, eng, "DROP TABLE IF EXISTS `sync_chunked`")
+		mustExec(t, eng, "CREATE TABLE `sync_chunked` (id INT NOT NULL PRIMARY KEY, name VARCHAR(255))")
+		defer mustExec(t, eng, "DROP TABLE IF EXISTS `sync_chunked`")
+
+		const rows = 500
+		ids := make([]value.Value, rows)
+		names := make([]value.Value, rows)
+		for i := 0; i < rows; i++ {
+			ids[i] = value.Text(strconv.Itoa(i + 1))
+			names[i] = value.Text("name-" + strconv.Itoa(i+1))
+		}
+		dir := buildRun(t, []string{"sync_chunked"}, map[string][]syncCol{
+			"sync_chunked": {
+				{name: "id", dataType: "int", cells: ids},
+				{name: "name", dataType: "varchar", cells: names},
+			},
+		})
+
+		// A tiny packet budget and small batch size force the table's INSERTs
+		// across many chunks; every chunk must still land inside the one
+		// transaction.
+		chunked, err := target.Open(engineMySQL, eng.dsn, target.WithMaxPacketBytes(512))
+		if err != nil {
+			t.Fatalf("open target: %v", err)
+		}
+		defer chunked.Close()
+
+		p, err := restore.Prepare(restore.Options{RunDir: dir, Dialect: chunked.Dialect(), BatchSize: 10})
+		if err != nil {
+			t.Fatalf("prepare: %v", err)
+		}
+		if err := chunked.Apply(ctx, p, nil); err != nil {
+			t.Fatalf("apply: %v", err)
+		}
+		if got := countRows(ctx, t, eng, "sync_chunked"); got != rows {
+			t.Errorf("sync_chunked row count = %d, want %d", got, rows)
 		}
 	})
 

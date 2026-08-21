@@ -21,6 +21,15 @@ import (
 	"github.com/social-sync/digestive/internal/restore"
 )
 
+// defaultMaxPacketBytes bounds how many bytes of a table's INSERT SQL are sent
+// to the destination in a single ExecContext. A table's statements are split on
+// their boundaries into chunks no larger than this, so a large table no longer
+// overflows the driver/server max_allowed_packet limit. 4 MiB is the most
+// conservative common server default (older MySQL), so it works everywhere out
+// of the box; raise it via sync.max_packet_bytes when the destination allows
+// bigger packets and fewer round trips are wanted.
+const defaultMaxPacketBytes = 4 << 20
+
 // Type is the destination engine named by config `sync.type`.
 type Type string
 
@@ -55,16 +64,32 @@ func resolve(t string) (binding, error) {
 
 // Target is an opened destination database ready to apply a restore into.
 type Target struct {
-	db      *sql.DB
-	dialect restore.Dialect
-	host    string
-	name    string
+	db        *sql.DB
+	dialect   restore.Dialect
+	host      string
+	name      string
+	maxPacket int
+}
+
+// Option configures a Target at open time.
+type Option func(*Target)
+
+// WithMaxPacketBytes sets the maximum byte size of a single statement batch sent
+// to the destination during Apply. A table's INSERTs are split into chunks no
+// larger than this so a large table never overflows the driver/server
+// max_allowed_packet limit. A non-positive value keeps the default.
+func WithMaxPacketBytes(n int) Option {
+	return func(t *Target) {
+		if n > 0 {
+			t.maxPacket = n
+		}
+	}
 }
 
 // Open resolves typ, forces multi-statement execution on the DSN (a restore
 // emits several statements per table), and opens a pooled connection. It does
 // not dial the server; call Ping to verify connectivity.
-func Open(typ, dsn string) (*Target, error) {
+func Open(typ, dsn string, opts ...Option) (*Target, error) {
 	b, err := resolve(typ)
 	if err != nil {
 		return nil, err
@@ -87,7 +112,11 @@ func Open(typ, dsn string) (*Target, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open destination: %w", err)
 	}
-	return &Target{db: db, dialect: b.dialect, host: cfg.Addr, name: cfg.DBName}, nil
+	t := &Target{db: db, dialect: b.dialect, host: cfg.Addr, name: cfg.DBName, maxPacket: defaultMaxPacketBytes}
+	for _, o := range opts {
+		o(t)
+	}
+	return t, nil
 }
 
 // Dialect is the restore dialect this destination's type resolved to. It is the
@@ -128,6 +157,11 @@ func (nopReporter) TableDone(string, int64) {}
 //
 // The destination schema must already exist — a restore is INSERTs only, so a
 // missing table surfaces here as a database error and rolls the sync back.
+//
+// A table's INSERTs are executed in packet-sized chunks (see WithMaxPacketBytes)
+// rather than one giant statement, so a large table never overflows the
+// destination's max_allowed_packet limit. Every chunk still runs inside the one
+// transaction, so the all-or-nothing guarantee is unchanged.
 func (t *Target) Apply(ctx context.Context, p *restore.Prepared, rep Reporter) error {
 	if rep == nil {
 		rep = nopReporter{}
@@ -170,8 +204,10 @@ func (t *Target) Apply(ctx context.Context, p *restore.Prepared, rep Reporter) e
 		}
 
 		rep.TableStart(table.Name)
-		if _, err := tx.ExecContext(ctx, buf.String()); err != nil {
-			return fmt.Errorf("apply table %q: %w", table.Name, err)
+		for _, chunk := range packetChunks(buf.Bytes(), t.maxPacket) {
+			if _, err := tx.ExecContext(ctx, string(chunk)); err != nil {
+				return fmt.Errorf("apply table %q: %w", table.Name, err)
+			}
 		}
 		rep.TableDone(table.Name, rows)
 	}
@@ -181,4 +217,55 @@ func (t *Target) Apply(ctx context.Context, p *restore.Prepared, rep Reporter) e
 	}
 	committed = true
 	return nil
+}
+
+// packetChunks splits a table's INSERT SQL into slices to execute in order, each
+// grouping whole statements into no more than maxPacket bytes. Executing each
+// chunk separately keeps every packet under the destination's max_allowed_packet
+// limit while preserving MultiStatements batching within a chunk.
+//
+// Statements are split on the ";\n" that restore writes after every statement;
+// restore escapes newlines inside string values (see restore.quoteString), so
+// that sequence only ever marks a real statement boundary. A single statement
+// larger than maxPacket cannot be split and is returned on its own — lower
+// sync.batch_size if even one statement overflows the limit. A maxPacket <= 0
+// returns the whole table as one chunk (the pre-chunking behaviour). A chunk
+// that is only whitespace (such as the trailing blank line restore appends) is
+// dropped so no empty query is executed; Apply already skips zero-row tables, so
+// a header-only chunk never reaches here.
+func packetChunks(sqlBytes []byte, maxPacket int) [][]byte {
+	nonEmpty := func(chunks [][]byte, chunk []byte) [][]byte {
+		if len(bytes.TrimSpace(chunk)) == 0 {
+			return chunks
+		}
+		return append(chunks, chunk)
+	}
+
+	if maxPacket <= 0 {
+		return nonEmpty(nil, sqlBytes)
+	}
+
+	sep := []byte(";\n")
+	var chunks [][]byte
+	// chunkStart marks the first byte of the statements queued but not yet
+	// emitted; pos walks statement by statement.
+	chunkStart, pos := 0, 0
+	for pos < len(sqlBytes) {
+		i := bytes.Index(sqlBytes[pos:], sep)
+		stmtEnd := len(sqlBytes)
+		if i >= 0 {
+			stmtEnd = pos + i + len(sep)
+		}
+		// If adding this statement would exceed the budget and something is
+		// already queued, emit the queued statements so this one starts fresh.
+		if stmtEnd-chunkStart > maxPacket && pos > chunkStart {
+			chunks = nonEmpty(chunks, sqlBytes[chunkStart:pos])
+			chunkStart = pos
+		}
+		pos = stmtEnd
+		if i < 0 {
+			break
+		}
+	}
+	return nonEmpty(chunks, sqlBytes[chunkStart:])
 }

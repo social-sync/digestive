@@ -21,6 +21,7 @@ var (
 	syncCleanup         bool
 	syncDialect         string
 	syncBatchSize       int
+	syncMaxPacketBytes  int
 	syncAllowIncomplete bool
 	syncIgnoreConf      bool
 )
@@ -41,7 +42,7 @@ var syncCmd = &cobra.Command{
 		"in the working directory is honoured exactly as `restore` honours it.",
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		res, warnings, err := runSync(cmd.Context(), args)
+		res, warnings, err := runSync(cmd, args)
 		return finish("sync", res, warnings, err, func() {
 			// The (kept) run directory is echoed for inspection or re-apply;
 			// a cleaned-up run has none to print.
@@ -69,7 +70,8 @@ type syncDest struct {
 	Database string `json:"database"`
 }
 
-func runSync(ctx context.Context, args []string) (*syncResult, []string, error) {
+func runSync(cmd *cobra.Command, args []string) (*syncResult, []string, error) {
+	ctx := cmd.Context()
 	// A machine consumer cannot answer the confirmation prompt, so --json must
 	// carry an explicit --yes: it forces the caller to acknowledge the live-DB
 	// write rather than have it silently implied.
@@ -92,8 +94,15 @@ func runSync(ctx context.Context, args []string) (*syncResult, []string, error) 
 	}
 
 	// Resolve and open the destination first, so a missing/invalid sync block or
-	// an unreachable target fails before any export work happens.
-	tgt, err := target.Open(cfg.Sync.Type, cfg.Sync.DSN)
+	// an unreachable target fails before any export work happens. The packet
+	// budget comes from the flag when set, else config, else the built-in default.
+	maxPacket := 0
+	if syncMaxPacketBytes > 0 {
+		maxPacket = syncMaxPacketBytes
+	} else if cfg.Sync.MaxPacketBytes != nil {
+		maxPacket = *cfg.Sync.MaxPacketBytes
+	}
+	tgt, err := target.Open(cfg.Sync.Type, cfg.Sync.DSN, target.WithMaxPacketBytes(maxPacket))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -172,10 +181,16 @@ func runSync(ctx context.Context, args []string) (*syncResult, []string, error) 
 			rulesPath = restore.DefaultRulesFile
 		}
 	}
+	// Batch size comes from the flag when the user set it, else config, else the
+	// restore default (Prepare treats a non-positive value as the default).
+	batchSize := syncBatchSize
+	if !cmd.Flags().Changed("batch-size") && cfg.Sync.BatchSize != nil {
+		batchSize = *cfg.Sync.BatchSize
+	}
 	prepared, err := restore.Prepare(restore.Options{
 		RunDir:          runDir,
 		Dialect:         dialect,
-		BatchSize:       syncBatchSize,
+		BatchSize:       batchSize,
 		AllowIncomplete: syncAllowIncomplete,
 		RulesPath:       rulesPath,
 		Logger:          log,
@@ -246,7 +261,8 @@ func init() {
 	syncCmd.Flags().BoolVar(&syncYes, "yes", false, "skip the confirmation prompt")
 	syncCmd.Flags().BoolVar(&syncCleanup, "cleanup", false, "delete the run directory after a successful apply (ignored when a run directory is given)")
 	syncCmd.Flags().StringVar(&syncDialect, "dialect", "", "override the restore dialect from sync.type (singlestore or mysql)")
-	syncCmd.Flags().IntVar(&syncBatchSize, "batch-size", 1000, "rows per multi-row INSERT statement")
+	syncCmd.Flags().IntVar(&syncBatchSize, "batch-size", 1000, "rows per multi-row INSERT statement (overrides sync.batch_size)")
+	syncCmd.Flags().IntVar(&syncMaxPacketBytes, "max-packet-bytes", 0, "max bytes per statement batch sent to the destination; splits large tables to avoid max_allowed_packet errors (0 = sync.max_packet_bytes or the built-in default)")
 	syncCmd.Flags().BoolVar(&syncAllowIncomplete, "allow-incomplete", false, "apply even if the manifest reports an incomplete export")
 	syncCmd.Flags().BoolVar(&syncIgnoreConf, "ignore-restore-conf", false, "ignore a restore.yaml in the working directory")
 	syncCmd.Flags().BoolVar(&noTUI, "no-tui", false, "disable the live progress UI and log plainly instead")
