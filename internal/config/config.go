@@ -49,6 +49,17 @@ type SyncConfig struct {
 	// Type selects the destination engine, which fixes both the SQL driver and
 	// the restore dialect. Currently "mysql" or "singlestore" (both MySQL-wire).
 	Type string `yaml:"type"`
+	// BatchSize is the number of rows packed into each multi-row INSERT
+	// statement. Nil uses the built-in default (1000). Lower it to shrink the
+	// individual statements a large-row table produces. The --batch-size flag
+	// overrides it.
+	BatchSize *int `yaml:"batch_size"`
+	// MaxPacketBytes bounds how many bytes of a table's INSERT SQL are sent to
+	// the destination in a single round trip: a table's statements are split
+	// into chunks no larger than this, so a large table no longer overflows the
+	// server/driver max_allowed_packet limit ("packet for query is too large").
+	// Nil uses the built-in default. The --max-packet-bytes flag overrides it.
+	MaxPacketBytes *int `yaml:"max_packet_bytes"`
 }
 
 // HashingConfig holds the secret used to key deterministic hashing.

@@ -18,6 +18,13 @@ destination:
 # sync:
 #   dsn: ${SYNC_DSN}   # go-sql-driver/mysql DSN for the destination
 #   type: mysql        # mysql or singlestore
+#   # Optional tuning for large tables. sync applies each table's INSERTs in
+#   # chunks no larger than max_packet_bytes, so a big table never trips the
+#   # destination's max_allowed_packet ("packet for query is too large"). Lower
+#   # max_packet_bytes (and/or batch_size) if you still hit that limit; raise it
+#   # for fewer round trips when the server allows bigger packets.
+#   batch_size: 1000          # rows per multi-row INSERT statement
+#   max_packet_bytes: 4194304 # bytes per statement batch sent to the destination (4 MiB)
 
 # Optional. Turns on audit logging: when present, `export` and `sync` write a
 # per-run audit record and REQUIRE --requester-name / --requester-email. Set

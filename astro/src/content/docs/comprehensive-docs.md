@@ -258,12 +258,17 @@ ignore it entirely.
 sync:
   dsn: ${SYNC_DSN}
   type: mysql
+  # Optional tuning for large tables.
+  batch_size: 1000
+  max_packet_bytes: 4194304
 ```
 
 | Key | Type | Required | Description |
 | --- | --- | --- | --- |
 | `dsn` | string | for `sync` | A [go-sql-driver/mysql DSN](https://github.com/go-sql-driver/mysql#dsn-data-source-name) for the destination. Supply via `${VAR}`. |
 | `type` | string | for `sync` | The destination engine: `mysql` or `singlestore`. Selects both the driver and the [restore dialect](#the---dialect-flag-is-required). |
+| `batch_size` | int | no | Rows per multi-row `INSERT` statement (default `1000`). The `--batch-size` flag overrides it. |
+| `max_packet_bytes` | int | no | Max bytes per statement batch sent to the destination (default 4 MiB). Large tables are split into chunks no bigger than this to avoid `max_allowed_packet` errors — see [Large tables and packet size](#large-tables-and-packet-size). The `--max-packet-bytes` flag overrides it. |
 
 `sync` applies data into an **existing schema** — it never creates tables — and
 loads it in a single all-or-nothing transaction. See [Sync](#sync) for the full
@@ -495,7 +500,8 @@ For a complete flag-by-flag matrix of every command, see the
 | `--yes` | `false` | Skip the confirmation prompt (auto-skipped when non-interactive). |
 | `--cleanup` | `false` | Delete the run directory after a successful apply. Ignored when a run directory is given. |
 | `--dialect` | from `type` | Override the restore dialect: `singlestore` or `mysql`. |
-| `--batch-size` | `1000` | Rows per multi-row `INSERT`. |
+| `--batch-size` | `1000` | Rows per multi-row `INSERT`. Overrides `sync.batch_size`. |
+| `--max-packet-bytes` | `4 MiB` | Max bytes per statement batch sent to the destination; splits large tables to avoid `max_allowed_packet` errors. `0` uses `sync.max_packet_bytes` or the default. Overrides `sync.max_packet_bytes`. |
 | `--allow-incomplete` | `false` | Apply even if the manifest reports an incomplete export. |
 | `--ignore-restore-conf` | `false` | Ignore a `restore.yaml` in the working directory. |
 | `--no-tui` | `false` | Disable the live progress UI and log plainly instead. |
@@ -1131,6 +1137,9 @@ block — a DSN and a type:
 sync:
   dsn: ${SYNC_DSN}   # go-sql-driver/mysql DSN for the destination
   type: mysql        # mysql or singlestore
+  # Optional tuning for large tables (see "Large tables and packet size").
+  batch_size: 1000          # rows per multi-row INSERT statement
+  max_packet_bytes: 4194304 # bytes per statement batch (4 MiB)
 ```
 
 ### What `sync` does
@@ -1164,6 +1173,28 @@ schema has drifted from the export, reconcile it with a
 [`restore.yaml`](#reconciling-schema-drift), exactly as you would for
 `restore`.
 :::
+
+### Large tables and packet size
+
+A destination server caps how many bytes a single query may carry
+(`max_allowed_packet`). Rather than send a whole table's `INSERT`s as one giant
+query — which trips that cap with `packet for query is too large. Try adjusting
+the Config.MaxAllowedPacket` — `sync` splits each table's statements into chunks
+no larger than **`max_packet_bytes`** and applies them one after another. Every
+chunk still runs inside the one transaction, so the all-or-nothing guarantee is
+unchanged.
+
+Two knobs, both settable in the `sync` config block or per-run on the flags:
+
+- **`max_packet_bytes`** (`--max-packet-bytes`) bounds the bytes sent per round
+  trip. It defaults to **4 MiB**, the most conservative common server default, so
+  it works everywhere out of the box. Raise it for fewer round trips when your
+  destination allows bigger packets; lower it if you still hit the limit.
+- **`batch_size`** (`--batch-size`) bounds the rows per `INSERT` statement
+  (default `1000`). A single statement can't be split, so if even one row's
+  `INSERT` exceeds `max_packet_bytes` (very wide rows), lower `batch_size` too.
+
+A flag always overrides the config value.
 
 ### The confirmation guard
 
@@ -1216,7 +1247,8 @@ implies.
 | `--yes` | `false` | Skip the confirmation prompt. |
 | `--cleanup` | `false` | Delete the run directory after a successful apply. Ignored when you pass an existing run directory. |
 | `--dialect` | from `type` | Override the restore dialect: `singlestore` or `mysql`. |
-| `--batch-size` | `1000` | Rows per multi-row `INSERT`. |
+| `--batch-size` | `1000` | Rows per multi-row `INSERT`. Overrides `sync.batch_size`. |
+| `--max-packet-bytes` | `4 MiB` | Max bytes per statement batch sent to the destination; splits large tables to avoid `max_allowed_packet` errors. `0` uses `sync.max_packet_bytes` or the default. Overrides `sync.max_packet_bytes`. |
 | `--allow-incomplete` | `false` | Apply even if the manifest reports an incomplete export. |
 | `--ignore-restore-conf` | `false` | Ignore a `restore.yaml` in the working directory. |
 | `--no-tui` | `false` | Disable the live progress UI and log plainly instead. |
