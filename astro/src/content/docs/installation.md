@@ -24,7 +24,12 @@ curl -sSfL https://raw.githubusercontent.com/social-sync/digestive/main/install.
 The script detects your OS and architecture, downloads the matching release
 asset, verifies its SHA-256 checksum, and installs `digestive` to
 `/usr/local/bin` (falling back to `~/.local/bin`). Set `DIGESTIVE_BIN_DIR` to
-choose the target directory, or `DIGESTIVE_VERSION=v1.2.3` to pin a version.
+choose the target directory, or `DIGESTIVE_VERSION=v1.2.3` to pin a version. To
+install into the directory you run the command from, set `DIGESTIVE_CURRENT_DIR=1`:
+
+```sh
+curl -sSfL https://raw.githubusercontent.com/social-sync/digestive/main/install.sh | DIGESTIVE_CURRENT_DIR=1 sh
+```
 
 **Manual:** grab an archive for your platform from the
 [releases page](https://github.com/social-sync/digestive/releases), extract it,
