@@ -7,9 +7,12 @@
 # SHA-256 checksum, and installs the `digestive` binary.
 #
 # Environment overrides:
-#   DIGESTIVE_VERSION   tag to install (default: latest release, e.g. v1.2.3)
-#   DIGESTIVE_BIN_DIR   install directory (default: /usr/local/bin, or ~/.local/bin
-#                     if that is not writable)
+#   DIGESTIVE_VERSION       tag to install (default: latest release, e.g. v1.2.3)
+#   DIGESTIVE_BIN_DIR       install directory (default: /usr/local/bin, or ~/.local/bin
+#                         if that is not writable)
+#   DIGESTIVE_CURRENT_DIR   if set (to any value), install into the directory you
+#                         ran curl from ($PWD), e.g.
+#                           curl -sSfL .../install.sh | DIGESTIVE_CURRENT_DIR=1 sh
 set -eu
 
 REPO="social-sync/digestive"
@@ -97,15 +100,25 @@ info "Extracting..."
 tar -xzf "$TMP/$ASSET" -C "$TMP" "$BINARY" || err "failed to extract $BINARY"
 chmod +x "$TMP/$BINARY"
 
-BIN_DIR="${DIGESTIVE_BIN_DIR:-/usr/local/bin}"
+# DIGESTIVE_CURRENT_DIR installs into the directory curl was run from ($PWD).
+# It takes precedence over DIGESTIVE_BIN_DIR.
+if [ -n "${DIGESTIVE_CURRENT_DIR:-}" ]; then
+  BIN_DIR="$PWD"
+else
+  BIN_DIR="${DIGESTIVE_BIN_DIR:-/usr/local/bin}"
+fi
 if [ ! -d "$BIN_DIR" ] || [ ! -w "$BIN_DIR" ]; then
-  if [ -n "${DIGESTIVE_BIN_DIR:-}" ]; then
+  if [ -n "${DIGESTIVE_BIN_DIR:-}" ] || [ -n "${DIGESTIVE_CURRENT_DIR:-}" ]; then
     err "install dir not writable: $BIN_DIR"
   fi
   BIN_DIR="$HOME/.local/bin"
   mkdir -p "$BIN_DIR"
   warn "/usr/local/bin not writable; installing to $BIN_DIR"
 fi
+
+# Resolve to an absolute path so status messages and the PATH check are clear
+# even when a relative directory (e.g. ".") was requested.
+BIN_DIR=$(cd "$BIN_DIR" && pwd)
 
 mv "$TMP/$BINARY" "$BIN_DIR/$BINARY"
 info "Installed $BINARY to $BIN_DIR/$BINARY"
