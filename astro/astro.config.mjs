@@ -5,10 +5,12 @@ import starlight from '@astrojs/starlight';
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://digestive.socialsync.tools',
+	redirects: {
+		'/': '/overview/',
+	},
 	integrations: [
 		starlight({
 			title: 'Digestive',
-			customCss: ['./src/styles/home.css'],
 			description:
 				'A single-binary database exporter that anonymises, redacts, and ' +
 				'deterministically hashes data on the way out.',
