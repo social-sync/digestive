@@ -59,7 +59,7 @@ func init() {
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, _ []string) {
 		logLevelChanged = cmd.Flags().Changed("log-level")
 	}
-	rootCmd.AddCommand(exportCmd, validateCmd, restoreCmd, syncCmd)
+	rootCmd.AddCommand(exportCmd, validateCmd, restoreCmd, syncCmd, reportCmd)
 }
 
 func newLogger() *slog.Logger {

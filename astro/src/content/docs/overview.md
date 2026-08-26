@@ -26,6 +26,7 @@ Digestive was built as a tool anyone can use, but here at [Social Sync](https://
 - Sync data from a source database straight into a destination database using `digestive sync`. As of now though, it doesn't handle creating tables.
 - You can use another config file - `restore.yaml` - to make changes to the data as it's restored, if your destination database schema is different from your source one.
 - You can specify audit logging configuration - JSON  based audit logs  are created each time an `export` is ran that identifies the user, what they exported, and when.
+- Produce an anonymisation report of your whitelisted tables using `digestive report` - an HTML or Markdown document showing, per column, whether it's anonymised and how.
 
 ## What it doesn't do
 
