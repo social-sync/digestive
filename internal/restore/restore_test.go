@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/social-sync/digestive/internal/archive"
 	"github.com/social-sync/digestive/internal/manifest"
 	"github.com/social-sync/digestive/internal/typemap"
 	"github.com/social-sync/digestive/internal/value"
@@ -291,4 +292,48 @@ func TestSummaryStatementCounts(t *testing.T) {
 	if got := byName["empty"]; got.Rows != 0 || got.Statements != 0 {
 		t.Errorf("empty summary = %+v, want rows=0 statements=0", got)
 	}
+}
+
+// TestRestoreFromZipArchive proves the export-artifact round-trip: a run
+// directory zipped by internal/archive, extracted again, and restored produces
+// the same SQL as restoring the directory directly. It guards the seam the
+// restore command uses when handed a .zip instead of a directory.
+func TestRestoreFromZipArchive(t *testing.T) {
+	dir := writeFixture(t, map[string][]col{
+		"users": {
+			{name: "id", dataType: "int", cells: []value.Value{value.Text("1"), value.Text("2")}},
+			{name: "name", dataType: "varchar", cells: []value.Value{value.Text("Ada"), value.Null}},
+		},
+	})
+	fromDir := runRestore(t, dir, Options{Dialect: MySQL})
+
+	zipPath := filepath.Join(t.TempDir(), "run.zip")
+	if err := archive.Zip(dir, zipPath); err != nil {
+		t.Fatalf("zip: %v", err)
+	}
+	extracted, cleanup, err := archive.ExtractRun(zipPath)
+	if err != nil {
+		t.Fatalf("extract: %v", err)
+	}
+	defer cleanup()
+
+	fromZip := runRestore(t, extracted, Options{Dialect: MySQL})
+
+	// Ignore the header line, which records the run dir/created timestamp only.
+	if strip(fromZip) != strip(fromDir) {
+		t.Errorf("restore from zip differs from restore from directory\n--- dir ---\n%s\n--- zip ---\n%s", fromDir, fromZip)
+	}
+}
+
+// strip drops comment lines so two restores can be compared on their SQL alone.
+func strip(sql string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(sql, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "--") {
+			continue
+		}
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
 }

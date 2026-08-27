@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/social-sync/digestive/internal/archive"
 	"github.com/social-sync/digestive/internal/restore"
 	"github.com/spf13/cobra"
 )
@@ -26,12 +27,14 @@ type restoreResult struct {
 }
 
 var restoreCmd = &cobra.Command{
-	Use:   "restore <run-dir>",
+	Use:   "restore <run-dir|run.zip>",
 	Short: "Turn an export run into a SQL script of INSERTs",
 	Long: "restore reads an export run directory (a manifest.json plus one Parquet " +
 		"file per table) and writes a single SQL script of INSERT statements to stdout, " +
 		"ready to pipe into the mysql client or paste into a SQL editor. It connects to " +
 		"nothing and needs no config: the manifest and Parquet files are the only inputs.\n\n" +
+		"The argument may also be a .zip archive produced by `export --zip`: restore " +
+		"unpacks it to a temporary directory, reads it, and cleans up afterwards.\n\n" +
 		"Types are preserved for a same-engine round-trip. Table names are emitted " +
 		"unqualified, so choose the target database with the client (e.g. mysql -D dbname).\n\n" +
 		"If a restore.yaml exists in the working directory, its schema-reconciliation " +
@@ -50,6 +53,18 @@ var restoreCmd = &cobra.Command{
 			return err
 		}
 
+		// Accept either a run directory or a .zip archive produced by
+		// `export --zip`. A zip is unpacked to a temporary directory that lives
+		// for the whole restore and is removed on return.
+		runDir, cleanup, err := resolveRunDir(args[0])
+		if err != nil {
+			if jsonOutput {
+				return reportJSON("restore", nil, nil, err)
+			}
+			return err
+		}
+		defer cleanup()
+
 		// Auto-discover restore.yaml in the working directory (where the local
 		// app and its migrations live), unless explicitly ignored.
 		rulesPath := ""
@@ -60,12 +75,17 @@ var restoreCmd = &cobra.Command{
 		}
 
 		if jsonOutput {
-			res, err := restoreSummary(args[0], dialect, rulesPath)
+			// Read from the resolved directory but report the path the user
+			// gave (the archive, when they passed one), not the temp dir.
+			res, err := restoreSummary(runDir, dialect, rulesPath)
+			if res != nil {
+				res.RunDir = args[0]
+			}
 			return reportJSON("restore", res, nil, err)
 		}
 
 		return restore.Run(restore.Options{
-			RunDir:          args[0],
+			RunDir:          runDir,
 			Dialect:         dialect,
 			BatchSize:       restoreBatchSize,
 			AllowIncomplete: restoreAllowIncomplete,
@@ -100,6 +120,21 @@ func restoreSummary(runDir string, dialect restore.Dialect, rulesPath string) (*
 		res.TotalStatements += s.Statements
 	}
 	return res, nil
+}
+
+// resolveRunDir turns the restore argument into a run directory. A directory is
+// used as-is; a .zip archive (detected by content, not just extension) is
+// unpacked to a temporary directory whose lifetime the returned cleanup owns.
+// cleanup is never nil, so `defer cleanup()` is always safe.
+func resolveRunDir(path string) (dir string, cleanup func(), err error) {
+	isZip, err := archive.LooksLikeZip(path)
+	if err != nil {
+		return "", func() {}, err
+	}
+	if !isZip {
+		return path, func() {}, nil
+	}
+	return archive.ExtractRun(path)
 }
 
 func init() {

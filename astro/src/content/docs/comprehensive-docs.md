@@ -493,6 +493,7 @@ For a complete flag-by-flag matrix of every command, see the
 | `--run-name` | timestamp | Name of the run sub-directory. |
 | `--delete-on-failure` | `false` | Remove the run directory entirely if the export fails, so repeated failures don't accumulate partial output. |
 | `--no-tui` | `false` | Disable the live progress UI and log plainly instead. |
+| `--zip` | `false` | Package the finished run into a single `<run-name>.zip` next to the destination and remove the run directory. The printed path (and `--json` `run_dir`) becomes the `.zip`; `restore` and `sync` accept it directly. |
 | `--json` | `false` | Emit a JSON result on stdout instead of the TUI ([JSON output](#json-output)). |
 | `--requester-name` | — | Name of the requester. Required when [`compliance`](#the-compliance-block) is configured. |
 | `--requester-email` | — | Email of the requester. Required when `compliance` is configured; must be a valid address. |
@@ -887,12 +888,19 @@ It connects to nothing and needs no config: the manifest and Parquet files are
 the only inputs. Types are preserved for a **same-engine round-trip** — the SQL
 loads into a copy of the database the export was read from.
 
+The argument is a run directory **or** a `.zip` archive from
+[`export --zip`](#export-flags). A zip is unpacked to a temporary directory,
+read, and removed afterwards — nothing to unzip by hand.
+
 ```sh
 # Write a .sql file you can hand to a SQL editor:
 ./digestive restore ./exports/2026-08-14T15-04-05Z --dialect singlestore > dump.sql
 
 # Or stream straight into a client:
 ./digestive restore ./exports/2026-08-14T15-04-05Z --dialect mysql | mysql -D mydb
+
+# A zipped export works the same:
+./digestive restore ./exports/2026-08-14T15-04-05Z.zip --dialect mysql | mysql -D mydb
 ```
 
 The SQL goes to **stdout**; logs and warnings go to stderr, so redirecting or
@@ -1133,6 +1141,9 @@ client, no intermediate `.sql` file, no piping.
 
 # Skip the export and apply an existing run directory (retry a failed apply):
 ./digestive sync ./exports/2026-08-14T15-04-05Z
+
+# The existing run may also be a .zip from `export --zip` (unpacked automatically):
+./digestive sync ./exports/2026-08-14T15-04-05Z.zip
 ```
 
 The destination lives in your [config](#the-sync-block) under a `sync`

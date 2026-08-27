@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/social-sync/digestive/internal/archive"
 	"github.com/social-sync/digestive/internal/config"
 	"github.com/social-sync/digestive/internal/export"
 	"github.com/social-sync/digestive/internal/manifest"
@@ -19,6 +20,7 @@ var (
 	runName         string
 	deleteOnFailure bool
 	noTUI           bool
+	zipExport       bool
 )
 
 // tableStat is one table's row count in an export/sync JSON result.
@@ -84,7 +86,34 @@ func doExport(ctx context.Context) (*exportResult, []string, error) {
 	if err != nil {
 		return nil, warnings, err
 	}
+
+	// Package the finished run into a single .zip artifact, done last so the
+	// archive captures every file the run wrote (including the audit record).
+	// The directory is replaced by the archive: with --zip the export's result
+	// is one file, which is the whole point of the flag.
+	if zipExport {
+		zipPath, err := zipRun(runDir)
+		if err != nil {
+			return nil, warnings, err
+		}
+		res.RunDir = zipPath
+	}
 	return res, warnings, nil
+}
+
+// zipRun archives runDir into a sibling <runDir>.zip and, on success, removes
+// the original directory so the run is left as a single file. It returns the
+// archive path. The source directory is removed only after the archive is fully
+// written, so a failure mid-archive never destroys the exported data.
+func zipRun(runDir string) (string, error) {
+	zipPath := runDir + ".zip"
+	if err := archive.Zip(runDir, zipPath); err != nil {
+		return "", fmt.Errorf("zip run directory: %w", err)
+	}
+	if err := os.RemoveAll(runDir); err != nil {
+		return "", fmt.Errorf("remove run directory after zip: %w", err)
+	}
+	return zipPath, nil
 }
 
 // exportResultFromManifest reads back the manifest the run just wrote and turns
@@ -157,6 +186,7 @@ func init() {
 	exportCmd.Flags().StringVar(&runName, "run-name", "", "run directory name (default: timestamp)")
 	exportCmd.Flags().BoolVar(&deleteOnFailure, "delete-on-failure", false, "remove the run directory if the export fails")
 	exportCmd.Flags().BoolVar(&noTUI, "no-tui", false, "disable the live progress UI and log plainly instead")
+	exportCmd.Flags().BoolVar(&zipExport, "zip", false, "package the run into a single .zip artifact and remove the run directory")
 	addComplianceFlags(exportCmd)
 	exportCmd.SetContext(context.Background())
 }

@@ -33,9 +33,10 @@ var syncCmd = &cobra.Command{
 		"configured tables, generates the same INSERTs `restore` would, and applies " +
 		"them directly into the destination database in config's `sync` block — no " +
 		"mysql client, no intermediate piping.\n\n" +
-		"With no argument it exports fresh, then applies. Given a run directory it " +
-		"skips the export and applies that existing run (useful for retrying a failed " +
-		"apply without re-querying the source).\n\n" +
+		"With no argument it exports fresh, then applies. Given a run directory (or a " +
+		".zip archive from `export --zip`, which it unpacks) it skips the export and " +
+		"applies that existing run (useful for retrying a failed apply without " +
+		"re-querying the source).\n\n" +
 		"The whole apply runs in a single transaction: it either lands completely or " +
 		"rolls back, leaving the destination untouched. The destination schema must " +
 		"already exist — sync inserts data, it does not create tables. A restore.yaml " +
@@ -133,12 +134,23 @@ func runSync(cmd *cobra.Command, args []string) (*syncResult, []string, error) {
 		}
 	}
 
-	// Obtain a run directory: use the one given, or export a fresh one.
+	// Obtain a run directory: use the one given, or export a fresh one. A given
+	// argument may be a .zip archive (from `export --zip`), which is unpacked to
+	// a temporary directory that this run owns and removes on return.
 	runDir := ""
+	passedArtifact := "" // the path the user gave, when reusing an existing run
 	created := false
+	cleanup := func() {}
+	defer func() { cleanup() }()
 	var warnings []string
 	if len(args) == 1 {
-		runDir = args[0]
+		resolved, c, err := resolveRunDir(args[0])
+		if err != nil {
+			return nil, nil, err
+		}
+		cleanup = c
+		runDir = resolved
+		passedArtifact = args[0]
 	} else {
 		if cfg.Source.DSN == "" {
 			return nil, nil, fmt.Errorf("source.dsn is required to export (or pass an existing run directory)")
@@ -205,7 +217,12 @@ func runSync(cmd *cobra.Command, args []string) (*syncResult, []string, error) {
 	}
 	log.Info("sync complete", "host", tgt.Host(), "database", tgt.Database())
 
+	// Report the path the user can re-run: the archive they passed, or the run
+	// directory (fresh or existing) otherwise — never the temporary unpack dir.
 	dir := runDir
+	if passedArtifact != "" {
+		dir = passedArtifact
+	}
 	result := &syncResult{
 		RunDir:      &dir,
 		RunID:       res.RunID,
