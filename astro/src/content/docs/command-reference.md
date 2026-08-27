@@ -15,6 +15,7 @@ task-oriented walkthroughs, follow the links to the dedicated pages.
 | [`export`](#export) | Export configured tables to Parquet. |
 | [`restore`](#restore) | Turn an export run into a SQL script of `INSERT`s. |
 | [`sync`](#sync) | Export and apply straight into a destination database. |
+| [`report`](#report) | Print an anonymisation report of the configured tables. |
 
 ## Global flags
 
@@ -103,6 +104,31 @@ See [Sync](/comprehensive-docs/#sync).
 | `--no-tui` | — | `false` | Disable the live progress UI and log plainly instead. |
 
 Also accepts the [compliance flags](#compliance-flags).
+
+## `report`
+
+```sh
+digestive report --format html|markdown
+```
+
+Connect to the source and print an anonymisation report of every whitelisted
+table to stdout. For each column it shows whether it is anonymised, and — when
+it is — which transform is applied:
+
+- **No** — the column is exported untouched (highlighted in the HTML output so
+  potential leaks stand out).
+- **Yes** — a transform is applied; the Method cell summarises it, e.g.
+  `hash (length 16)`, `mask (keep first 2, last 2)`, `json_anonymise (3 paths)`.
+- **Excluded** — the column is dropped from the export entirely.
+
+The config is validated against the live schema first (the same check as
+[`validate`](#validate)), so a stale or invalid config fails rather than
+producing a misleading report. The document is written straight to stdout;
+`--json` has no effect on this command.
+
+| Flag | Value | Default | Description |
+| ---- | ----- | ------- | ----------- |
+| `--format` | string | `html` | Output format: `html` (a self-contained, styled document) or `markdown` (GitHub-flavored pipe tables). |
 
 ## Compliance flags
 

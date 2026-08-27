@@ -55,6 +55,7 @@ digestive init                             # create starter .env + config.yaml (
 digestive validate --config config.yaml    # check config against live schema, no export
 digestive export   --config config.yaml    # run the export
 digestive restore  <run-dir> --dialect singlestore > dump.sql   # export run -> SQL INSERTs
+digestive report   --config config.yaml > report.html           # anonymisation report of the whitelisted tables
 ```
 
 `init` writes a `config.yaml` and a `.env` containing a freshly generated
@@ -340,6 +341,37 @@ so data never lands without an audit. The S3 sink uses
 R2, Ceph, Wasabi, and AWS S3.
 
 See [ADR-0008](./docs/adr/0008-compliance-audit-logging.md) for the design.
+
+## Report
+
+```sh
+digestive report --config config.yaml > report.html   # default format: html
+digestive report --format markdown > report.md
+```
+
+`report` connects to the source and prints an anonymisation report of every
+whitelisted table to stdout — a quick way to review, or share for sign-off,
+exactly what leaves the database untouched. For each column it shows whether it
+is anonymised and, if so, how:
+
+- **No** — exported untouched. In the HTML output these rows are highlighted so
+  potential leaks stand out.
+- **Yes** — a transform is applied; the method is summarised, e.g.
+  `hash (length 16)`, `mask (keep first 2, last 2)`, `json_anonymise (3 paths)`.
+- **Excluded** — the column is dropped from the export entirely.
+
+The config is validated against the live schema first (the same check as
+`validate`), so a stale config — for example a rule pointing at a column that no
+longer exists — fails rather than producing a misleading report.
+
+`report` flags:
+
+- `--format html|markdown` — output format (default `html`). `html` is a
+  self-contained, styled document you can open in a browser; `markdown` is
+  GitHub-flavored pipe tables for pasting into a PR or wiki.
+
+The document is written straight to stdout; the global `--json` flag has no
+effect on this command.
 
 ## Configuration
 
