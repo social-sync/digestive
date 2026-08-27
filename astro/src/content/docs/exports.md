@@ -19,6 +19,17 @@ destination:
 
 The exported folder will also contain a `manifest` file - this contains the details of each table exported, it's columns, and the datatypes stored. This is used to translate the parquet data back into SQL later on.
 
+## Packaging an export as a single file.
+
+Pass `--zip` to bundle the whole run — manifest and every Parquet file — into a single `.zip` next to the destination directory, and remove the run folder:
+
+```sh
+digestive export --zip
+# ./exports/2026-08-14T15-04-05Z.zip
+```
+
+The point isn't compression (Parquet is already compact) — it's having **one artifact** to move, upload, or hand off instead of a folder of files. Both `restore` and `sync` accept the `.zip` directly and unpack it for you, so a zipped export behaves exactly like an unzipped run directory everywhere else.
+
 ## Tables.
 
 In order to get `digestive export` to actually export data, you have to whitelist the database tables you want to export:

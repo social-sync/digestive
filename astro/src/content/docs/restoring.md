@@ -21,6 +21,12 @@ Or you can pipe the result straight into the `mysql` command to import it direct
 mysql -uroot -p my_database_name < digestive restore {path-to-export-folder} --dialect=mysql
 ```
 
+The path you pass can be an export **folder** or a `.zip` archive produced by `digestive export --zip`. When you point `restore` at a zip, it unpacks it to a temporary directory, reads it, and cleans up afterwards — so a zipped export is a drop-in for the folder:
+
+```bash
+digestive restore {path-to-export}.zip --dialect=mysql > import.sql
+```
+
 ## Sync from source to destination.
 
 You can run an `export` and automatically pipe the result of the export from your source database by setting your destination database up in your config.yaml:
@@ -36,6 +42,12 @@ sync:
 Then you can run `digestive sync` - this will run the entire process end-to-end, and you can pass the `--cleanup` flag to remove the exported parquet files at the end.
 
 The `sync` runs in stages: first it will `export`, storing the data, then it will run `restore`.
+
+You can also pass `sync` an existing export to apply without re-exporting — either a run folder or a `.zip` from `digestive export --zip`, which it unpacks automatically:
+
+```bash
+digestive sync {path-to-export}.zip
+```
 
 
 ## Dealing with schema differences.

@@ -69,6 +69,10 @@ already exists it fails and writes nothing. Edit `.env` to set your
   so repeated failures don't accumulate partial output.
 - `--no-tui` — disable the live progress UI and emit plain structured log lines
   instead.
+- `--zip` — package the finished run into a single `<run-name>.zip` next to the
+  destination and remove the run directory, so an export is one artifact to move
+  around. The printed path (and `--json` `run_dir`) becomes the `.zip`; feed it
+  straight back to `restore` or `sync`, which unpack it transparently.
 - `--requester-name` / `--requester-email` — the person requesting the export.
   **Required** when [compliance audit logging](#compliance-audit-logging) is
   configured; ignored otherwise.
@@ -162,10 +166,16 @@ statements — ready to pipe into the `mysql` client or paste into a SQL editor.
 It reads **only** the run directory (manifest + Parquet); no config file, no
 database connection. Types are preserved for a same-engine round-trip.
 
+The argument may be a run directory **or** a `.zip` archive produced by
+`export --zip`. A zip is unpacked to a temporary directory, read, and cleaned up
+automatically — nothing to unzip by hand.
+
 ```sh
 digestive restore ./exports/2026-08-14T15-04-05Z --dialect singlestore > dump.sql
 # or stream straight into a client:
 digestive restore ./exports/2026-08-14T15-04-05Z --dialect mysql | mysql -D mydb
+# a zipped export works the same:
+digestive restore ./exports/2026-08-14T15-04-05Z.zip --dialect mysql | mysql -D mydb
 ```
 
 `restore` flags:
@@ -254,8 +264,9 @@ sync:
 ```
 
 ```sh
-digestive sync                                  # export fresh, then apply
-digestive sync ./exports/2026-08-14T15-04-05Z   # skip export, apply an existing run
+digestive sync                                    # export fresh, then apply
+digestive sync ./exports/2026-08-14T15-04-05Z     # skip export, apply an existing run
+digestive sync ./exports/2026-08-14T15-04-05Z.zip # apply a zipped export (unpacked automatically)
 ```
 
 The apply runs in a **single transaction**: it either lands completely or rolls

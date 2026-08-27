@@ -32,6 +32,14 @@ column list, original Source column types, nullability, and the mapping from
 Source type to the storage format's type. It is the source of truth for
 restoring exact INSERTs; the data files hold only values.
 
+### Archive
+An optional single-file packaging of a completed export run — a `.zip` holding
+the Manifest and every data file at its root. Requested with `export --zip`; the
+goal is one artifact to move or hand off, not compression (Parquet is already
+compact). `restore` and `sync` accept an archive wherever they accept a run
+directory, unpacking it to a temporary directory transparently. A round-trip
+(zip an export, then restore it) reproduces exactly the original run directory.
+
 ### Transformation
 A rule applied to a column's values on the way out. Families:
 - **Redaction** — remove or mask a value (no attempt at realism). v1 built-ins:

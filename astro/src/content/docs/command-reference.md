@@ -59,17 +59,19 @@ Export configured tables to Parquet.
 | `--run-name` | string | timestamp | Run directory name. |
 | `--delete-on-failure` | — | `false` | Remove the run directory if the export fails. |
 | `--no-tui` | — | `false` | Disable the live progress UI and log plainly instead. |
+| `--zip` | — | `false` | Package the run into a single `.zip` artifact and remove the run directory. |
 
 Also accepts the [compliance flags](#compliance-flags).
 
 ## `restore`
 
 ```sh
-digestive restore <run-dir> --dialect singlestore|mysql
+digestive restore <run-dir|run.zip> --dialect singlestore|mysql
 ```
 
 Turn an export run into a SQL script of `INSERT`s. Takes exactly one argument:
-the run directory to restore. See [Restore](/comprehensive-docs/#restore).
+the run directory to restore, or a `.zip` archive from `export --zip` (unpacked
+automatically). See [Restore](/comprehensive-docs/#restore).
 
 | Flag | Value | Default | Description |
 | ---- | ----- | ------- | ----------- |
@@ -85,7 +87,8 @@ digestive sync [run-dir]
 ```
 
 Export and apply straight into a destination database. Takes an optional
-argument: an existing run directory to apply instead of exporting a fresh one.
+argument: an existing run directory (or a `.zip` from `export --zip`, unpacked
+automatically) to apply instead of exporting a fresh one.
 See [Sync](/comprehensive-docs/#sync).
 
 | Flag | Value | Default | Description |
